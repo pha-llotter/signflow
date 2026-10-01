@@ -197,6 +197,36 @@ It sits in the bottom margin. On a source PDF whose own content runs to the very
 edge of the page it will overlap, so `PAGE_FOOTER=off` disables it and
 `PAGE_FOOTER_TEXT` changes the wording (`{brand}` and `{id}` are substituted).
 
+## Version control and backups
+
+Two layers, because they protect different things.
+
+**Git tracks the code.** Every change, with diffs, so a bad edit is one command
+away from being undone.
+
+```
+git log --oneline              # history
+git diff                       # what you have changed since the last commit
+git add -A && git commit -m "…"
+git restore <file>             # throw away changes to one file
+git reset --hard known-good    # back to the last verified-working state
+```
+
+The `known-good` tag marks a state with all six suites passing. Move it forward
+when you next have everything green: `git tag -f known-good`.
+
+**`.env` and `storage/` are deliberately untracked.** `.env` holds `APP_KEY`,
+which decrypts the stored SMTP password — committed once, it is effectively
+published even if a later commit removes it. `storage/` is the live database,
+uploaded originals and sealed PDFs: real documents, real audit trails, real
+personal data.
+
+**Zip checkpoints cover what git does not** — see `scripts/backup.ps1`. Those
+archives *do* include `.env` and `storage/`, which is exactly why they live
+outside the project and must be kept as protected as the server itself.
+
+So: git to undo a change, a zip checkpoint to recover an installation.
+
 ## Accounts and roles
 
 The installation is **invitation-only**. Public sign-up exists for exactly one
