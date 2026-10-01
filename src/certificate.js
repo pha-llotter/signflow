@@ -1,6 +1,7 @@
 import { StandardFonts, rgb } from 'pdf-lib';
 import { config } from './config.js';
 import { embedLogo } from './brand.js';
+import { version } from './version.js';
 
 const INK = rgb(0.07, 0.09, 0.13);
 const NAVY = rgb(0.10, 0.20, 0.42);
@@ -210,7 +211,10 @@ export async function buildCertificate(pdf, { doc, owner, recipients, events }) 
 
   // ---- Footer -------------------------------------------------------------
   pages.forEach((p, i) => {
-    const footer = `Certificate page ${i + 1} of ${pages.length}  ·  Document ${doc.id}  ·  Stored in ${config.dataRegion}`;
+    // The build is recorded here deliberately. If a defect is ever found in the
+    // sealing or hashing, this is what says whether a given document was
+    // produced by the affected code.
+    const footer = `Certificate page ${i + 1} of ${pages.length}  ·  Document ${doc.id}  ·  Stored in ${config.dataRegion}  ·  ${config.brand.name} ${version.stamp}`;
     p.drawLine({
       start: { x: MARGIN, y: MARGIN - 6 }, end: { x: A4[0] - MARGIN, y: MARGIN - 6 },
       thickness: 0.5, color: RULE,

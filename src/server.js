@@ -15,6 +15,7 @@ import settingsRoutes from './routes/settings.js';
 import teamRoutes from './routes/team.js';
 import profileRoutes from './routes/profile.js';
 import { currentUser } from './middleware/auth.js';
+import { version } from './version.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -73,6 +74,7 @@ app.use((req, res, next) => {
   res.locals.brand = config.brand;
   res.locals.dataRegion = config.dataRegion;
   res.locals.v = ASSET_VERSION;
+  res.locals.appVersion = version;
   // The dropzone rejects oversized files before uploading them, so it needs the
   // same limit multer enforces — derived from it rather than restated.
   res.locals.maxUploadMb = Math.round(config.maxUploadBytes / 1024 / 1024);
@@ -89,6 +91,21 @@ app.use('/', documentRoutes);
 app.use('/', prepareRoutes);
 app.use('/', signRoutes);
 app.use('/', verifyRoutes);
+
+/**
+ * Unauthenticated on purpose: a load balancer health check cannot sign in, and
+ * knowing which build is live is the first question when something is wrong.
+ * It exposes the version and nothing else — no counts, no configuration.
+ */
+app.get('/healthz', (req, res) => {
+  res.json({
+    status: 'ok',
+    version: version.number,
+    commit: version.sha,
+    startedAt: version.startedAt,
+    uptimeSeconds: Math.round(process.uptime()),
+  });
+});
 
 // '/' is owned by the verification page — see routes/verify.js.
 

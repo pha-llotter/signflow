@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# Refuses a commit that would publish secrets or live data.
+#
+# .gitignore is a convenience, not a guarantee: `git add -f`, a renamed file or
+# an edited ignore rule all slip past it. This runs on what is actually staged.
+# A key committed once stays in history even after a later commit deletes it,
+# so the only safe place to stop it is here.
+#
+# Enabled by `git config core.hooksPath .githooks`, which is versioned, so a
+# fresh clone gets the same protection.
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+fail=0
+
+note() {
+  if [ "$fail" -eq 0 ]; then
+    echo ""
+    echo "COMMIT BLOCKED"
+    echo "--------------"
+  fi
+  fail=1
+  echo "  $1"
+}
+
+# --- paths that must never be tracked ---------------------------------------
+for f in $staged; do
+  case "$f" in
+    .env|.env.*|*.key|*.pem|*.pfx|*.p12)
+      [ "$f" = ".env.example" ] || note "$f  — holds credentials" ;;
+    storage/*|*/storage/*)
+      note "$f  — live data (database, uploaded or sealed PDFs)" ;;
+    .secrets/*)
+      note "$f  — generated secret" ;;
+    *.db|*.db-wal|*.db-shm|*.sqlite|*.sqlite3)
+      note "$f  — database file" ;;
+  esac
+done
+
+# --- secret-shaped content in text files ------------------------------------
+# Narrow on purpose. A check that cries wolf gets bypassed with --no-verify,
+# and then it protects nothing.
+for f in $staged; do
+  [ -f "$f" ] || continue
+  case "$f" in
+    package-lock.json|.githooks/pre-commit|*.md) continue ;;
+  esac
+  git diff --cached -- "$f" | grep -q '^+.*-----BEGIN .*PRIVATE KEY' \
+    && note "$f  — private key block"
+  git diff --cached -- "$f" | grep -qE '^\+.*(AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})' \
+    && note "$f  — looks like a cloud or service token"
+  git diff --cached -- "$f" | grep -qE '^\+.*(SESSION_SECRET|APP_KEY)[[:space:]]*=[[:space:]]*[A-Za-z0-9+/=]{16,}' \
+    && note "$f  — a real SESSION_SECRET or APP_KEY value"
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "  Unstage with:  git restore --staged <file>"
+  echo "  If this is genuinely a false alarm:  git commit --no-verify"
+  echo ""
+  exit 1
+fi
+
+exit 0

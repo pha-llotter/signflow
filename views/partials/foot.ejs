@@ -3,6 +3,7 @@
     <img class="ftr-logo" src="/static/brand/logo-web.png?v=<%= v %>" alt="<%= brand.name %>" width="89" height="20">
     <p>
       <% if (brand.legalName) { %><%= brand.legalName %><% } %><% if (brand.regNo) { %> · Reg. No. <%= brand.regNo %><% } %>
+      <span class="ver" title="Build currently running"><%= appVersion.short %></span>
     </p>
     <p class="fine">
       Documents stored in <%= dataRegion %>. Signatures are standard electronic signatures under the

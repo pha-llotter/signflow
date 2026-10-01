@@ -94,6 +94,38 @@
         <a href="/team">administration log</a>.
       </p>
     <% } %>
+
+    <div class="card">
+      <h2>This installation</h2>
+      <p class="hint">
+        Quote the build when reporting a problem. It is also printed on every certificate of completion, so a
+        sealed document can be traced back to the exact code that produced it.
+      </p>
+      <div class="grid-2" style="margin-top:14px">
+        <div class="hash-box">
+          <div class="k">Version</div>
+          <div style="font-size:14px"><%= appVersion.short %></div>
+        </div>
+        <div class="hash-box">
+          <div class="k">Commit</div>
+          <div class="mono"><%= appVersion.sha || 'not built from a git checkout' %></div>
+        </div>
+        <div class="hash-box">
+          <div class="k">Running since</div>
+          <div style="font-size:14px"><%= new Date(appVersion.startedAt).toLocaleString() %></div>
+        </div>
+        <div class="hash-box">
+          <div class="k">Documents stored in</div>
+          <div style="font-size:14px"><%= dataRegion %></div>
+        </div>
+      </div>
+      <% if (appVersion.dirty) { %>
+        <div class="notice notice-warn" style="margin-top:14px">
+          This server is running code with uncommitted local changes, so the commit above does not describe
+          exactly what is live. Fine while developing; worth resolving before anything you intend to rely on.
+        </div>
+      <% } %>
+    </div>
   </div>
 </main>
 
