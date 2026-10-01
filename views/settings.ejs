@@ -1,0 +1,100 @@
+<%- include('partials/head', { title: 'Settings' }) %>
+<%- include('partials/nav') %>
+
+<main>
+  <div class="wrap" style="max-width:720px">
+    <div class="page-head">
+      <div>
+        <h1>Installation settings</h1>
+        <p class="sub">These apply to everyone on this installation, not just your account.</p>
+      </div>
+    </div>
+
+    <% if (saved) { %><div class="notice notice-ok" style="margin-top:0;margin-bottom:18px">Settings saved.</div><% } %>
+    <% if (test) { %><div class="notice notice-ok" style="margin-top:0;margin-bottom:18px"><%= test %></div><% } %>
+    <% if (error) { %><div class="notice notice-bad" style="margin-top:0;margin-bottom:18px"><%= error %></div><% } %>
+
+    <form method="post" action="/settings">
+      <div class="card">
+        <h2>Organisation</h2>
+        <div class="field" style="margin:14px 0 0">
+          <label for="org_name">Name</label>
+          <input id="org_name" name="org_name" type="text" value="<%= settings.org_name || '' %>"
+                 placeholder="Protea Heights Academy">
+          <p class="hint">Appears on invitations and in the footer of emails.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Outgoing mail</h2>
+        <p class="hint">
+          One mail server for the whole installation. Every signing invitation, reminder, completion notice and
+          team invitation goes out through it. Members cannot change this, which is why it lives here rather
+          than on each account.
+        </p>
+
+        <div class="grid-2" style="margin-top:16px">
+          <div class="field">
+            <label for="smtp_host">SMTP host</label>
+            <input id="smtp_host" name="smtp_host" type="text" value="<%= settings.smtp_host || '' %>" placeholder="smtp.office365.com">
+          </div>
+          <div class="field">
+            <label for="smtp_port">Port</label>
+            <input id="smtp_port" name="smtp_port" type="number" value="<%= settings.smtp_port || 587 %>">
+          </div>
+          <div class="field">
+            <label for="smtp_user">Username</label>
+            <input id="smtp_user" name="smtp_user" type="text" value="<%= settings.smtp_user || '' %>" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="smtp_pass">Password</label>
+            <input id="smtp_pass" name="smtp_pass" type="password"
+                   placeholder="<%= settings.smtp_pass_enc ? '•••••••• (leave blank to keep)' : '' %>" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label for="from_name">Default from name</label>
+            <input id="from_name" name="from_name" type="text" value="<%= settings.from_name || '' %>" placeholder="<%= brand.name %>">
+            <p class="hint">Used only when the sender has no name set.</p>
+          </div>
+          <div class="field">
+            <label for="from_email">From address</label>
+            <input id="from_email" name="from_email" type="email" value="<%= settings.from_email || '' %>" placeholder="noreply@phahs.org.za">
+            <p class="hint">Must be an address this server is allowed to send as.</p>
+          </div>
+        </div>
+
+        <label class="check">
+          <input type="checkbox" name="smtp_secure" value="1" <%= settings.smtp_secure ? 'checked' : '' %>>
+          <span>Use TLS from the first byte (port 465). Leave off for STARTTLS on 587.</span>
+        </label>
+
+        <div class="notice" style="background:var(--hover);border-color:var(--line);color:var(--ink-2);margin-top:16px">
+          <strong style="display:block;margin-bottom:5px;color:var(--ink)">How a recipient sees it</strong>
+          Mail is sent from the one address above, because most servers reject a From they do not own. The
+          <em>display name</em> is whoever sent the document, and <strong>Reply-To is set to their own address</strong>,
+          so a recipient sees a name they recognise and replies reach the right person.
+        </div>
+
+        <p class="hint" style="margin-top:14px">
+          The password is encrypted at rest with AES-256-GCM. It has to be recoverable to authenticate to your
+          mail server, so it is encrypted rather than hashed — unlike account passwords, which are hashed with
+          Argon2id and can never be read back.
+        </p>
+      </div>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button class="btn" type="submit">Save settings</button>
+        <button class="btn btn-ghost" type="submit" formaction="/settings/test" formnovalidate>Send a test email</button>
+      </div>
+    </form>
+
+    <% if (settings.updated_at) { %>
+      <p class="hint" style="margin-top:16px">
+        Last changed <%= new Date(settings.updated_at).toLocaleString() %>. Changes are recorded in the
+        <a href="/team">administration log</a>.
+      </p>
+    <% } %>
+  </div>
+</main>
+
+<%- include('partials/foot') %>

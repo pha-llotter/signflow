@@ -1,0 +1,35 @@
+<header class="topbar">
+  <%# Signed in, the logo goes to your own work; signed out, to the public
+      verification page at the root. %>
+  <a class="brand" href="<%= user ? '/documents' : '/' %>">
+    <img src="/static/brand/logo-web.png?v=<%= v %>" alt="<%= brand.name %>" width="98" height="22">
+  </a>
+  <% if (user) { %>
+    <nav>
+      <a href="/documents">Documents</a>
+      <% if (isAdmin) { %>
+        <a href="/team">Team</a>
+        <a href="/settings">Settings</a>
+      <% } %>
+      <a href="/profile">Profile</a>
+      <a href="/" class="nav-quiet">Verify</a>
+    </nav>
+    <%- include('theme-toggle') %>
+    <form method="post" action="/logout" class="inline">
+      <span class="who">
+        <%= user.display_name %><% if (isAdmin) { %> <span class="role-tag">admin</span><% } %>
+      </span>
+      <button class="link-btn" type="submit">Sign out</button>
+    </form>
+  <% } else { %>
+    <%# No "Verify" link here — the page they are on is the verification page. %>
+    <nav>
+      <a href="/login">Sign in</a>
+    </nav>
+    <%- include('theme-toggle') %>
+  <% } %>
+</header>
+<script src="/static/js/theme.js?v=<%= v %>" defer></script>
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div class="wrap"><div class="flash flash-<%= flash.type %>"><%= flash.text %></div></div>
+<% } %>

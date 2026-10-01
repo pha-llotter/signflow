@@ -1,0 +1,95 @@
+<%- include('partials/head', { title: 'Prepare · ' + doc.title, bodyClass: 'no-scroll' }) %>
+
+<div class="placer" id="placer">
+  <div class="placer-bar">
+    <a class="brand brand-compact" href="/documents" title="Back to documents">
+      <img src="/static/brand/logo-mark.png?v=<%= v %>" alt="<%= brand.name %>" width="24" height="24">
+    </a>
+    <h1><%= doc.title %></h1>
+    <span class="hint" id="save-state">All changes saved</span>
+    <div class="spacer"></div>
+    <button type="button" class="btn btn-sm placer-toggle" id="toggle-palette">+ Add field</button>
+    <button type="button" class="btn btn-ghost btn-sm placer-toggle" id="toggle-inspector">Options</button>
+    <%- include('partials/theme-toggle') %>
+    <div class="zoombar">
+      <button type="button" id="zoom-out" title="Zoom out">−</button>
+      <span id="zoom-label">100%</span>
+      <button type="button" id="zoom-in" title="Zoom in">+</button>
+    </div>
+    <label class="check" style="margin:0">
+      <input type="checkbox" id="grid-toggle" checked>
+      <span style="font-size:13px">Snap to grid</span>
+    </label>
+    <button class="btn btn-ghost btn-sm" id="save-btn" type="button">Save draft</button>
+    <form method="post" action="/documents/<%= doc.id %>/send" class="inline" id="send-form">
+      <button class="btn btn-sm" type="submit" id="send-btn">Send for signature</button>
+    </form>
+  </div>
+
+  <aside class="palette">
+    <h3>Placing fields for</h3>
+    <ul class="recip-list" id="recip-list">
+      <% recipients.forEach(function (r, i) { %>
+        <li data-id="<%= r.id %>" class="<%= i === 0 ? 'active' : '' %>">
+          <span class="swatch" data-swatch="<%= r.id %>"></span>
+          <span><%= r.name %></span>
+        </li>
+      <% }); %>
+    </ul>
+    <p class="hint" style="margin-bottom:18px">Drag a field onto the page. Signer fields belong to whoever is selected here; static ones belong to the document.</p>
+
+    <% fieldGroups.forEach(function (group) { %>
+      <h3><%= group %></h3>
+      <div class="palette-grid">
+        <% Object.entries(fieldTypes).filter(function (e) { return e[1].group === group; }).forEach(function (entry) { %>
+          <div class="chip" draggable="true" data-type="<%= entry[0] %>" title="<%= entry[1].fill === 'author' ? 'Fixed by you — the signer does not fill this in' : entry[1].fill === 'auto' ? 'Filled in automatically when they sign' : 'The signer fills this in' %>">
+            <%= entry[1].label %>
+          </div>
+        <% }); %>
+      </div>
+    <% }); %>
+  </aside>
+
+  <div class="canvas-area grid-on" id="canvas-area">
+    <!-- Guidance lives over the document because that is where the author is
+         looking; a hint in the toolbar goes unread. -->
+    <div class="placer-banner" id="placer-banner" hidden>
+      <span id="banner-text"></span>
+      <button type="button" class="banner-cancel" id="banner-cancel">Cancel</button>
+    </div>
+
+    <div class="placer-empty" id="placer-empty" hidden>
+      <strong>No fields on this document yet</strong>
+      <span class="only-wide">
+        Drag a field from the palette on the left onto the page — or tap one, then tap the page.
+      </span>
+      <span class="only-narrow">
+        Tap <b>Add field</b> at the top, choose what you need, then tap the spot on the page where it belongs.
+      </span>
+    </div>
+
+    <div id="pages"></div>
+  </div>
+
+  <aside class="inspector" id="inspector">
+    <h3>Field</h3>
+    <p class="hint" id="no-selection">Nothing selected. Click a field on the page to change it, or drag a new one across.</p>
+    <div id="inspector-body" hidden></div>
+  </aside>
+</div>
+
+<script>
+  window.__DOC__ = {
+    id: <%- JSON.stringify(doc.id) %>,
+    pdfUrl: <%- JSON.stringify('/documents/' + doc.id + '/original.pdf') %>,
+    pageSizes: <%- JSON.stringify(pageSizes) %>,
+    recipients: <%- JSON.stringify(recipients.map(function (r) { return { id: r.id, name: r.name, email: r.email }; })) %>,
+    fields: <%- JSON.stringify(fields) %>,
+    fieldTypes: <%- JSON.stringify(fieldTypes) %>,
+    stampPresets: <%- JSON.stringify(stampPresets) %>
+  };
+</script>
+<script src="/static/js/theme.js?v=<%= v %>" defer></script>
+<script type="module" src="/static/js/placer.js"></script>
+</body>
+</html>

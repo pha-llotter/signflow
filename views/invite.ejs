@@ -1,0 +1,39 @@
+<%- include('partials/head', { title: 'Accept your invitation' }) %>
+<%- include('partials/nav') %>
+
+<main>
+  <div class="auth card">
+    <h1>Set up your account</h1>
+    <p class="sub">
+      You have been invited as <%= invite.role === 'admin' ? 'an administrator' : 'a member' %>.
+    </p>
+
+    <% if (error) { %><div class="notice notice-bad" style="margin-top:0"><%= error %></div><% } %>
+
+    <div class="hash-box" style="margin-top:16px">
+      <div class="k">You will sign in with</div>
+      <div style="font-size:14px"><%= invite.email %></div>
+    </div>
+
+    <form method="post" action="/invite/<%= token %>" style="margin-top:18px">
+      <div class="field">
+        <label for="display_name">Your name</label>
+        <input id="display_name" name="display_name" type="text" value="<%= values.display_name || '' %>"
+               required autofocus autocomplete="name">
+        <p class="hint">Recipients see this on the documents you send.</p>
+      </div>
+      <div class="field">
+        <label for="password">Choose a password</label>
+        <input id="password" name="password" type="password" required minlength="10" autocomplete="new-password">
+        <p class="hint">At least 10 characters. Stored hashed with Argon2id — never in the clear.</p>
+      </div>
+      <div class="field">
+        <label for="password_confirm">Confirm password</label>
+        <input id="password_confirm" name="password_confirm" type="password" required minlength="10" autocomplete="new-password">
+      </div>
+      <button class="btn" type="submit" style="width:100%">Create my account</button>
+    </form>
+  </div>
+</main>
+
+<%- include('partials/foot') %>

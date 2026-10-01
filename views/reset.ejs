@@ -1,0 +1,30 @@
+<%- include('partials/head', { title: 'Set a new password' }) %>
+<%- include('partials/nav') %>
+
+<main>
+  <div class="auth card">
+    <h1>Set a new password</h1>
+    <p class="sub">for <%= user.email %></p>
+
+    <% if (error) { %><div class="notice notice-bad" style="margin-top:0"><%= error %></div><% } %>
+
+    <form method="post" action="/reset/<%= token %>" style="margin-top:18px">
+      <div class="field">
+        <label for="password">New password</label>
+        <input id="password" name="password" type="password" required minlength="10" autofocus autocomplete="new-password">
+        <p class="hint">At least 10 characters.</p>
+      </div>
+      <div class="field">
+        <label for="password_confirm">Confirm new password</label>
+        <input id="password_confirm" name="password_confirm" type="password" required minlength="10" autocomplete="new-password">
+      </div>
+      <button class="btn" type="submit" style="width:100%">Set password and sign in</button>
+    </form>
+
+    <p class="hint" style="margin-top:18px">
+      This link works once, and only until it expires. Your old password stops working straight away.
+    </p>
+  </div>
+</main>
+
+<%- include('partials/foot') %>

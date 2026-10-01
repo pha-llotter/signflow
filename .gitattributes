@@ -1,0 +1,20 @@
+# Normalise line endings so a Windows checkout does not show every file as
+# modified the moment it is touched on another machine, or vice versa.
+* text=auto eol=lf
+
+# Keep CRLF for the PowerShell scripts — some Windows tooling is fussy about it.
+*.ps1 text eol=crlf
+
+# Binary: never diff, never convert.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.pdf  binary
+*.ico  binary
+*.woff  binary
+*.woff2 binary
+*.db   binary
+
+# Generated; collapsed in diffs so a dependency bump does not bury a real change.
+package-lock.json linguist-generated=true -diff

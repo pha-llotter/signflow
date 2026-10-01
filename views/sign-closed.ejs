@@ -1,0 +1,16 @@
+<%- include('partials/head', { title: heading }) %>
+<%- include('partials/nav') %>
+
+<main>
+  <div class="wrap-narrow" style="margin-top:50px">
+    <div class="card" style="text-align:center;padding:40px 30px">
+      <h1 style="font-size:20px;margin:0 0 10px"><%= heading %></h1>
+      <p class="hint" style="font-size:14px"><%= message %></p>
+      <div class="btn-row" style="justify-content:center;margin-top:22px">
+        <a class="btn btn-ghost" href="/">Verify a document</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/foot') %>

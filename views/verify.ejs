@@ -1,0 +1,157 @@
+<%- include('partials/head', { title: 'Verify a document' }) %>
+<%- include('partials/nav') %>
+
+<main>
+  <div class="wrap" style="max-width:760px">
+    <div class="page-head">
+      <div>
+        <h1>Verify a document</h1>
+        <p class="sub">
+          Check a signed PDF against the seal we recorded when it was completed. No account needed —
+          don't take our word for it.
+        </p>
+      </div>
+    </div>
+
+    <% if (result) { %>
+      <% if (result.error) { %>
+        <div class="verdict verdict-bad"><div class="icon">!</div><div><h2>Nothing to check</h2><p><%= result.error %></p></div></div>
+      <% } else if (result.match === 'none') { %>
+        <div class="verdict verdict-bad">
+          <div class="icon">✕</div>
+          <div><h2>No match</h2><p><%= result.message %></p></div>
+        </div>
+      <% } else { %>
+        <div class="verdict <%= result.match === 'sealed' ? 'verdict-ok' : 'verdict-warn' %>">
+          <div class="icon"><%= result.match === 'sealed' ? '✓' : 'i' %></div>
+          <div>
+            <h2><%= result.match === 'sealed' ? 'Verified — intact and unaltered' : result.match === 'signed' ? 'Matches the signed document' : 'Matches the original upload' %></h2>
+            <p><%= result.message %></p>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="card">
+        <h2>What we hashed</h2>
+        <p class="hint"><%= result.filename %></p>
+        <div class="hash-box" style="margin-top:10px">
+          <div class="k">SHA-256 of the file you gave us</div>
+          <div class="mono"><%= result.sha %></div>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <h2>Check a file</h2>
+      <p class="hint">The file never leaves this server's memory — we hash it and throw it away.</p>
+      <form method="post" action="/check" enctype="multipart/form-data" style="margin-top:14px">
+        <div class="field">
+          <%- include('partials/dropzone', {
+                id: 'verify-input',
+                name: 'pdf',
+                accept: 'application/pdf,.pdf',
+                maxMb: maxUploadMb,
+                title: 'Drop a signed PDF here',
+                sub: `we hash it and throw it away · up to ${maxUploadMb} MB`
+              }) %>
+        </div>
+        <button class="btn" type="submit">Check this PDF</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Or look one up</h2>
+      <p class="hint">Paste a document ID or any of the hashes printed on a certificate of completion.</p>
+      <form method="post" action="/" style="margin-top:14px">
+        <div class="field"><input type="text" name="query" value="<%= query %>" placeholder="Document ID or SHA-256 hash" required></div>
+        <button class="btn btn-ghost" type="submit">Look it up</button>
+      </form>
+    </div>
+
+    <% if (lookup && !lookup.found) { %>
+      <div class="card">
+        <div class="verdict verdict-bad" style="margin:0">
+          <div class="icon">✕</div>
+          <div><h2>Not found</h2><p>Nothing here matches <span class="mono"><%= lookup.id %></span>.</p></div>
+        </div>
+      </div>
+    <% } %>
+
+    <% if (lookup && lookup.found) { %>
+      <div class="card">
+        <h2><%= lookup.doc.title %></h2>
+        <p class="hint">
+          <span class="pill pill-<%= lookup.doc.status %>"><%= lookup.doc.status %></span>
+          · sent by <%= lookup.owner.display_name %><% if (lookup.owner.org_name) { %> (<%= lookup.owner.org_name %>)<% } %>
+          <% if (lookup.doc.completed_at) { %> · completed <%= formatStamp(lookup.doc.completed_at) %><% } %>
+        </p>
+
+        <div class="grid-2" style="margin-top:16px">
+          <div class="hash-box">
+            <div class="k">Original document (SHA-256)</div>
+            <div class="mono"><%= lookup.doc.original_sha256 %></div>
+          </div>
+          <div class="hash-box">
+            <div class="k">Signed, before certificate (SHA-256)</div>
+            <div class="mono"><%= lookup.doc.signed_sha256 || 'not yet sealed' %></div>
+          </div>
+          <div class="hash-box" style="grid-column:1/-1">
+            <div class="k">Sealed file, certificate included (SHA-256)</div>
+            <div class="mono"><%= lookup.doc.sealed_sha256 || 'not yet sealed' %></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Who signed</h2>
+        <table style="margin-top:10px">
+          <thead><tr><th>Name</th><th>Status</th><th>Signed</th><th>IP</th></tr></thead>
+          <tbody>
+            <% lookup.recipients.forEach(function (r) { %>
+              <tr>
+                <td class="td-primary"><strong><%= r.name %></strong><div class="hint"><%= r.email %></div></td>
+                <td data-label="Status"><span class="pill pill-<%= r.status %>"><%= r.status %></span></td>
+                <td data-label="Signed" class="hint"><%= r.signed_at ? formatStamp(r.signed_at) : '—' %></td>
+                <td data-label="IP" class="hint"><%= r.last_ip || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Audit trail</h2>
+        <ul class="audit" style="margin-top:12px">
+          <% lookup.events.slice().reverse().forEach(function (e) { %>
+            <li>
+              <time><%= formatStamp(e.created_at) %></time>
+              <div>
+                <span class="who"><%= e.actor %></span> — <%= e.action %>
+                <% if (e.detail) { %><span class="det"><%= e.detail %></span><% } %>
+                <span class="det"><%= e.ip || 'no IP recorded' %></span>
+              </div>
+            </li>
+          <% }); %>
+        </ul>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <h2>How this works</h2>
+      <p class="hint">
+        When every signer is done we flatten their input into the PDF and take a SHA-256 hash of it — that is
+        the <strong>signed</strong> hash, and it is printed on the certificate of completion. We then append the
+        certificate and hash the whole file again — the <strong>sealed</strong> hash. A certificate cannot carry
+        the hash of a file it is itself part of, which is why there are two.
+      </p>
+      <p class="hint">
+        Change a single byte of either file — a word, a date, a pixel of a signature — and its hash changes
+        completely and matches nothing here. That is what makes the seal tamper-evident.
+      </p>
+    </div>
+  </div>
+</main>
+
+<script src="/static/js/dropzone.js?v=<%= v %>" defer></script>
+
+<%- include('partials/foot') %>

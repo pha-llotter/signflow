@@ -1,0 +1,87 @@
+<%- include('partials/head', { title: 'Sign · ' + doc.title }) %>
+
+<header class="topbar">
+  <span class="brand"><img src="/static/brand/logo-web.png?v=<%= v %>" alt="<%= brand.name %>" width="98" height="22"></span>
+  <nav style="margin-right:auto"><span class="hint"><%= doc.title %></span></nav>
+  <span class="who">Signing as <%= recipient.name %></span>
+  <%- include('partials/theme-toggle') %>
+</header>
+<script src="/static/js/theme.js?v=<%= v %>" defer></script>
+
+<div class="sign-layout">
+  <div class="sign-doc">
+    <div id="pages"></div>
+  </div>
+
+  <aside class="sign-side" id="sign-side">
+    <!-- Collapsed peek on phones; the whole panel on anything wider. -->
+    <button type="button" class="sheet-handle" id="sheet-toggle" aria-expanded="false" aria-controls="sign-side">
+      <span class="sheet-grip" aria-hidden="true"></span>
+      <span class="sheet-label"><strong id="sheet-progress">0 of <%= myFields.length %></strong> fields done</span>
+      <span class="sheet-cta">Review &amp; sign</span>
+    </button>
+
+    <h2 style="margin:0 0 4px;font-size:17px">Review &amp; sign</h2>
+    <p class="hint" style="margin-top:0">
+      <strong><%= owner.display_name %></strong>
+      <% if (owner.org_name) { %> (<%= owner.org_name %>)<% } %>
+      has asked you to sign this.
+    </p>
+    <% if (doc.message) { %>
+      <div class="notice" style="background:var(--line-2);border-color:var(--line);color:var(--ink-2)"><%= doc.message %></div>
+    <% } %>
+
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:22px 0 8px">
+      Your fields (<span id="done-count">0</span> of <%= myFields.length %>)
+    </h3>
+    <ul class="todo-list" id="todo-list">
+      <% myFields.forEach(function (f) { %>
+        <li data-id="<%= f.id %>">
+          <span class="tick">✓</span>
+          <span><%= fieldTypes[f.type].label %> <span class="hint">· page <%= f.page + 1 %></span></span>
+        </li>
+      <% }); %>
+    </ul>
+
+    <div class="notice" style="background:#f7f8fa;border-color:var(--line);color:var(--ink-2);font-size:12.5px;line-height:1.5">
+      <strong style="display:block;margin-bottom:5px;color:var(--ink)">Before you sign</strong>
+      Signing this records your name, email address, IP address, browser and the time of every step, and seals
+      that record to the document with a SHA-256 hash. It is kept as evidence that you signed, and stored in
+      <%= dataRegion %>. This is processed under the Electronic Communications and Transactions Act and POPIA.
+      Your location is never taken.
+    </div>
+
+    <label class="check" style="margin:16px 0">
+      <input type="checkbox" id="consent">
+      <span>I agree to sign this document electronically, and to the record described above being kept.</span>
+    </label>
+
+    <div id="sign-error" class="notice notice-bad" style="display:none"></div>
+
+    <button class="btn" id="finish-btn" style="width:100%" disabled>Finish signing</button>
+    <button class="btn btn-ghost btn-sm" id="decline-btn" style="width:100%;margin-top:9px">Decline to sign</button>
+
+    <p class="hint" style="margin-top:14px;font-size:11.5px">
+      This link is unique to you. Do not forward it — anyone holding it can sign in your name.
+    </p>
+  </aside>
+</div>
+
+<form method="post" action="/sign/<%= token %>/decline" id="decline-form" hidden>
+  <input type="hidden" name="reason" id="decline-reason">
+</form>
+
+<script>
+  window.__SIGN__ = {
+    token: <%- JSON.stringify(token) %>,
+    pdfUrl: <%- JSON.stringify('/sign/' + token + '/document.pdf') %>,
+    recipientId: <%- JSON.stringify(recipient.id) %>,
+    recipientName: <%- JSON.stringify(recipient.name) %>,
+    recipientEmail: <%- JSON.stringify(recipient.email) %>,
+    fields: <%- JSON.stringify(fields) %>,
+    fieldTypes: <%- JSON.stringify(fieldTypes) %>
+  };
+</script>
+<script type="module" src="/static/js/sign.js"></script>
+</body>
+</html>

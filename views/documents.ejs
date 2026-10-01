@@ -1,0 +1,71 @@
+<%- include('partials/head', { title: 'Documents' }) %>
+<%- include('partials/nav') %>
+
+<main>
+  <div class="wrap">
+    <div class="page-head">
+      <div>
+        <h1>Documents</h1>
+        <p class="sub">
+          <%= docs.length %> in total ·
+          <%= counts.draft || 0 %> draft ·
+          <%= counts.sent || 0 %> out for signature ·
+          <%= counts.completed || 0 %> completed
+        </p>
+      </div>
+      <div class="spacer"></div>
+      <a class="btn" href="/documents/new">Send a document</a>
+    </div>
+
+    <% if (!mailReady) { %>
+      <div class="notice notice-warn" style="margin-top:0;margin-bottom:18px">
+        Outgoing mail is not configured, so signing links will be written to the server console instead of emailed.
+        <% if (isAdmin) { %>
+          <a href="/settings">Set up mail</a> to send them automatically.
+        <% } else { %>
+          Ask an administrator to set it up — you can still copy signing links by hand in the meantime.
+        <% } %>
+      </div>
+    <% } %>
+
+    <div class="card" style="padding:14px 8px">
+      <% if (!docs.length) { %>
+        <div class="empty">
+          <p style="font-size:16px;margin:0 0 6px;color:var(--ink-2)">Nothing here yet.</p>
+          <p style="margin:0 0 20px">Upload a PDF, drop the fields where they belong, and send it.</p>
+          <a class="btn" href="/documents/new">Send your first document</a>
+        </div>
+      <% } else { %>
+        <table>
+          <thead>
+            <tr><th>Document</th><th>Status</th><th>Signatures</th><th>Created</th><th></th></tr>
+          </thead>
+          <tbody>
+            <% docs.forEach(function (d) { %>
+              <tr>
+                <td class="td-primary">
+                  <a href="/documents/<%= d.id %>" style="font-weight:600;color:var(--ink)"><%= d.title %></a>
+                  <div class="hint" style="margin:2px 0 0"><%= d.filename %> · <%= d.page_count %> page<%= d.page_count === 1 ? '' : 's' %></div>
+                </td>
+                <td data-label="Status"><span class="pill pill-<%= d.status %>"><%= d.status %></span></td>
+                <td data-label="Signed"><%= d.signed_count %> of <%= d.recipient_count %></td>
+                <td data-label="Created" class="hint"><%= new Date(d.created_at).toLocaleDateString() %></td>
+                <td class="td-action">
+                  <% if (d.status === 'draft') { %>
+                    <a class="btn btn-ghost btn-sm" href="/documents/<%= d.id %>/prepare">Prepare</a>
+                  <% } else if (d.status === 'completed') { %>
+                    <a class="btn btn-ghost btn-sm" href="/documents/<%= d.id %>/signed.pdf">Download</a>
+                  <% } else { %>
+                    <a class="btn btn-ghost btn-sm" href="/documents/<%= d.id %>">Track</a>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/foot') %>

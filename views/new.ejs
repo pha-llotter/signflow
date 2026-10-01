@@ -1,0 +1,93 @@
+<%- include('partials/head', { title: 'New document' }) %>
+<%- include('partials/nav') %>
+
+<main>
+  <div class="wrap" style="max-width:720px">
+    <div class="page-head">
+      <div>
+        <h1>Send a document</h1>
+        <p class="sub">Upload the PDF and say who needs to sign it. You place the fields on the next screen.</p>
+      </div>
+    </div>
+
+    <% if (error) { %><div class="notice notice-bad" style="margin-top:0;margin-bottom:18px"><%= error %></div><% } %>
+
+    <form method="post" action="/documents/new" enctype="multipart/form-data">
+      <div class="card">
+        <h2>The file</h2>
+        <p class="hint">PDF only. We hash it on arrival — that hash is printed on the certificate of completion.</p>
+        <div class="field" style="margin-top:14px">
+          <%- include('partials/dropzone', {
+                id: 'pdf-input',
+                name: 'pdf',
+                accept: 'application/pdf,.pdf',
+                maxMb: maxUploadMb,
+                title: 'Drag your PDF here',
+                sub: `PDF only, up to ${maxUploadMb} MB`
+              }) %>
+        </div>
+        <div class="field">
+          <label for="title">Title</label>
+          <input id="title" name="title" type="text" placeholder="Leave blank to use the file name">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label for="message">Message to recipients <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label>
+          <textarea id="message" name="message" placeholder="Appears in the invitation email."></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Who signs</h2>
+        <p class="hint">Recipients never need an account — they get a private link and sign in the browser.</p>
+
+        <div id="recipients" style="margin-top:14px">
+          <div class="recipient-row">
+            <div><label>Name</label><input type="text" name="recipient_name" placeholder="Full name" required></div>
+            <div><label>Email</label><input type="email" name="recipient_email" placeholder="name@example.com" required></div>
+            <div style="padding-top:23px"><button type="button" class="btn btn-ghost btn-sm remove-recipient">Remove</button></div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-ghost btn-sm" id="add-recipient">+ Add another recipient</button>
+
+        <label class="check" style="margin-top:16px">
+          <input type="checkbox" name="signing_order" value="1">
+          <span>Sign in order — each person is only invited once the one before them has signed.</span>
+        </label>
+      </div>
+
+      <div class="card">
+        <h2>Expiry</h2>
+        <div class="field" style="max-width:200px;margin-bottom:0">
+          <label for="expires_in_days">Expires in (days)</label>
+          <input id="expires_in_days" name="expires_in_days" type="number" value="30" min="1" max="365">
+        </div>
+        <p class="hint">After this the signing links stop working and the document is marked expired.</p>
+      </div>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button class="btn" type="submit">Continue to fields →</button>
+        <a class="btn btn-ghost" href="/documents">Cancel</a>
+      </div>
+    </form>
+  </div>
+</main>
+
+<script src="/static/js/dropzone.js?v=<%= v %>" defer></script>
+<script>
+  // Recipients are a repeatable row; the server reads them as parallel arrays.
+  const list = document.getElementById('recipients');
+  document.getElementById('add-recipient').addEventListener('click', () => {
+    const row = list.firstElementChild.cloneNode(true);
+    row.querySelectorAll('input').forEach((i) => { i.value = ''; });
+    list.appendChild(row);
+    row.querySelector('input').focus();
+  });
+  list.addEventListener('click', (e) => {
+    if (!e.target.matches('.remove-recipient')) return;
+    // Always leave one row standing, or there is nothing to fill in.
+    if (list.children.length > 1) e.target.closest('.recipient-row').remove();
+  });
+</script>
+
+<%- include('partials/foot') %>

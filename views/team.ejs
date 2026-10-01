@@ -1,0 +1,172 @@
+<%- include('partials/head', { title: 'Team' }) %>
+<%- include('partials/nav') %>
+
+<main>
+  <div class="wrap">
+    <div class="page-head">
+      <div>
+        <h1>Team</h1>
+        <p class="sub">
+          <%= users.filter(function (u) { return u.status === 'active'; }).length %> active ·
+          <%= activeAdmins %> administrator<%= activeAdmins === 1 ? '' : 's' %> ·
+          <%= invites.length %> invitation<%= invites.length === 1 ? '' : 's' %> outstanding
+        </p>
+      </div>
+    </div>
+
+    <% if (!mailReady) { %>
+      <div class="notice notice-warn" style="margin-top:0;margin-bottom:18px">
+        Outgoing mail is not configured, so invitations cannot be emailed. Create one anyway and copy its
+        link, or <a href="/settings">set up mail first</a>.
+      </div>
+    <% } %>
+
+    <div class="card">
+      <h2>Invite someone</h2>
+      <p class="hint">They choose their own password. The invitation expires after 7 days.</p>
+      <form method="post" action="/team/invite" style="margin-top:14px">
+        <div class="grid-2">
+          <div class="field" style="margin-bottom:0">
+            <label for="invite-email">Email address</label>
+            <input id="invite-email" name="email" type="email" required placeholder="name@phahs.org.za">
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label for="invite-role">Role</label>
+            <select id="invite-role" name="role">
+              <option value="member">Member — sends and tracks their own documents</option>
+              <option value="admin">Administrator — also manages people and settings</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn" type="submit" style="margin-top:14px">Send invitation</button>
+      </form>
+    </div>
+
+    <% if (invites.length) { %>
+      <div class="card">
+        <h2>Outstanding invitations</h2>
+        <table style="margin-top:10px">
+          <thead><tr><th>Email</th><th>Role</th><th>Expires</th><th>Link</th><th></th></tr></thead>
+          <tbody>
+            <% invites.forEach(function (i) { %>
+              <tr>
+                <td class="td-primary">
+                  <strong><%= i.email %></strong>
+                  <div class="hint">invited by <%= i.inviter || 'a former administrator' %></div>
+                </td>
+                <td data-label="Role"><span class="pill <%= i.role === 'admin' ? 'pill-sent' : 'pill-draft' %>"><%= i.role %></span></td>
+                <td data-label="Expires" class="hint"><%= new Date(i.expires_at).toLocaleDateString() %></td>
+                <td data-label="Link">
+                  <button class="link-btn copy-link" type="button" data-link="<%= baseUrl %>/invite/<%= i.token %>">Copy link</button>
+                </td>
+                <td class="td-action" style="text-align:right">
+                  <form method="post" action="/team/invite/<%= i.id %>/resend" class="inline" style="display:inline-flex">
+                    <button class="btn btn-ghost btn-sm" type="submit">Resend</button>
+                  </form>
+                  <form method="post" action="/team/invite/<%= i.id %>/revoke" class="inline" style="display:inline-flex;margin-left:6px"
+                        onsubmit="return confirm('Withdraw the invitation to <%= i.email %>?')">
+                    <button class="btn btn-danger btn-sm" type="submit">Withdraw</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <h2>People</h2>
+      <p class="hint">
+        Deactivating someone blocks sign-in immediately and ends any session they have open. Their documents,
+        signatures and audit trail are kept — the evidence has to outlive the account.
+      </p>
+      <table style="margin-top:12px">
+        <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Documents</th><th>Last seen</th><th></th></tr></thead>
+        <tbody>
+          <% users.forEach(function (u) { %>
+            <tr>
+              <td class="td-primary">
+                <strong><%= u.display_name %></strong>
+                <% if (u.id === user.id) { %><span class="hint"> — you</span><% } %>
+                <div class="hint"><%= u.email %></div>
+              </td>
+              <td data-label="Role">
+                <span class="pill <%= u.role === 'admin' ? 'pill-sent' : 'pill-draft' %>"><%= u.role %></span>
+              </td>
+              <td data-label="Status">
+                <span class="pill <%= u.status === 'active' ? 'pill-completed' : 'pill-declined' %>"><%= u.status %></span>
+              </td>
+              <td data-label="Documents"><%= u.document_count %></td>
+              <td data-label="Last seen" class="hint">
+                <%= u.last_seen_at ? new Date(u.last_seen_at).toLocaleDateString() : 'never' %>
+              </td>
+              <td class="td-action" style="text-align:right">
+                <div class="btn-row" style="justify-content:flex-end;gap:6px">
+                  <form method="post" action="/team/user/<%= u.id %>/role" class="inline">
+                    <input type="hidden" name="role" value="<%= u.role === 'admin' ? 'member' : 'admin' %>">
+                    <button class="btn btn-ghost btn-sm" type="submit"
+                            <%= u.status !== 'active' ? 'disabled' : '' %>>
+                      <%= u.role === 'admin' ? 'Make member' : 'Make admin' %>
+                    </button>
+                  </form>
+
+                  <form method="post" action="/team/user/<%= u.id %>/reset" class="inline"
+                        onsubmit="return confirm('Email a password reset link to <%= u.email %>?')">
+                    <button class="btn btn-ghost btn-sm" type="submit">Reset password</button>
+                  </form>
+
+                  <form method="post" action="/team/user/<%= u.id %>/status" class="inline"
+                        <% if (u.status === 'active') { %>onsubmit="return confirm('Deactivate <%= u.display_name %>? They will be signed out immediately.')"<% } %>>
+                    <input type="hidden" name="status" value="<%= u.status === 'active' ? 'suspended' : 'active' %>">
+                    <button class="<%= u.status === 'active' ? 'btn btn-danger btn-sm' : 'btn btn-ghost btn-sm' %>"
+                            type="submit" <%= u.id === user.id ? 'disabled title="You cannot deactivate your own account"' : '' %>>
+                      <%= u.status === 'active' ? 'Deactivate' : 'Restore' %>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Administration log</h2>
+      <p class="hint">
+        Who was invited, promoted or deactivated, and who changed the installation settings. Kept separately
+        from document audit trails so it survives the deletion of every document those people touched.
+      </p>
+      <% if (!events.length) { %>
+        <p class="hint" style="margin-top:14px">Nothing recorded yet.</p>
+      <% } else { %>
+        <ul class="audit" style="margin-top:14px">
+          <% events.forEach(function (e) { %>
+            <li>
+              <time><%= new Date(e.created_at).toLocaleString() %></time>
+              <div>
+                <span class="who"><%= e.actor_email %></span> — <%= e.action %><% if (e.subject) { %>: <%= e.subject %><% } %>
+                <% if (e.detail) { %><span class="det"><%= e.detail %></span><% } %>
+                <span class="det"><%= e.ip || 'no IP recorded' %></span>
+              </div>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </div>
+  </div>
+</main>
+
+<script>
+  document.querySelectorAll('.copy-link').forEach((b) => {
+    b.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(b.dataset.link);
+      const was = b.textContent;
+      b.textContent = 'Copied';
+      setTimeout(() => { b.textContent = was; }, 1400);
+    });
+  });
+</script>
+
+<%- include('partials/foot') %>

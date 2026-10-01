@@ -1,0 +1,41 @@
+{
+  "name": "signflow",
+  "version": "0.1.0",
+  "description": "Electronic signature platform",
+  "main": "src/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "smoke": "node scripts/smoke.js",
+    "ui-check": "node scripts/ui-check.js",
+    "build-brand": "node scripts/build-brand.js",
+    "responsive-audit": "node scripts/responsive-audit.js",
+    "email-preview": "node scripts/email-preview.js",
+    "rotation-check": "node scripts/rotation-check.js",
+    "admin-check": "node scripts/admin-check.js",
+    "mobile-check": "node scripts/mobile-placer-check.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@node-rs/argon2": "^2.2.1",
+    "better-sqlite3": "^13.0.3",
+    "better-sqlite3-session-store": "^0.1.0",
+    "dotenv": "^18.0.4",
+    "ejs": "^6.0.1",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "multer": "^2.4.0",
+    "nodemailer": "^10.0.13",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0",
+    "pngjs": "^7.0.0"
+  }
+}

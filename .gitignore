@@ -1,0 +1,25 @@
+# Rebuilt from package-lock.json.
+node_modules/
+
+# --- never commit: secrets and live data ------------------------------------
+# .env holds SESSION_SECRET and APP_KEY. APP_KEY decrypts the stored SMTP
+# password, so it must not end up in history — once committed it is effectively
+# published, even if a later commit deletes it.
+.env
+.secrets/
+
+# The SQLite database, uploaded originals and sealed PDFs. Real documents,
+# real audit trails, real personal data. Backed up by scripts\backup.ps1, not
+# by git.
+storage/
+
+# --- generated output --------------------------------------------------------
+*.log
+ui-check/
+responsive-audit/
+email-preview/
+rotation-check/
+mobile-check/
+
+.DS_Store
+Thumbs.db

@@ -1,0 +1,36 @@
+<%
+  // name, accept, maxMb, title, sub, id — supplied by the including view.
+  const dzId = typeof id !== 'undefined' ? id : 'file';
+%>
+<label class="dropzone" data-dropzone data-max-mb="<%= maxMb %>" for="<%= dzId %>">
+  <input type="file" id="<%= dzId %>" name="<%= name %>" accept="<%= accept %>"
+         <%= typeof required === 'undefined' || required ? 'required' : '' %>>
+
+  <span class="dz-idle" data-dz-idle>
+    <svg class="dz-icon" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+         style="display:block;margin:0 auto 10px">
+      <path d="M12 16V4"></path>
+      <path d="m7.5 8.5 4.5-4.5 4.5 4.5"></path>
+      <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"></path>
+    </svg>
+    <span class="dz-title" style="display:block"><%= title %></span>
+    <span class="dz-sub" style="display:block">
+      or <span class="dz-browse">browse your files</span> · <%= sub %>
+    </span>
+  </span>
+
+  <span class="dz-file" data-dz-file hidden>
+    <svg class="dz-file-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M14 2.5H7A1.5 1.5 0 0 0 5.5 4v16A1.5 1.5 0 0 0 7 21.5h10a1.5 1.5 0 0 0 1.5-1.5V7z"></path>
+      <path d="M14 2.5V7h4.5"></path>
+    </svg>
+    <span>
+      <span class="dz-name" data-dz-name style="display:block"></span>
+      <span class="dz-meta" data-dz-meta style="display:block"></span>
+    </span>
+    <button type="button" class="dz-clear" data-dz-clear>Remove</button>
+  </span>
+</label>
+<p class="dz-error" data-dz-error hidden></p>

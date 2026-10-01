@@ -1,0 +1,66 @@
+<%- include('partials/head', { title: 'Your profile' }) %>
+<%- include('partials/nav') %>
+
+<main>
+  <div class="wrap" style="max-width:640px">
+    <div class="page-head">
+      <div>
+        <h1>Your profile</h1>
+        <p class="sub">
+          <%= user.email %> ·
+          <%= user.role === 'admin' ? 'Administrator' : 'Member' %>
+        </p>
+      </div>
+    </div>
+
+    <% if (saved) { %><div class="notice notice-ok" style="margin-top:0;margin-bottom:18px">Profile updated.</div><% } %>
+    <% if (passwordSaved) { %><div class="notice notice-ok" style="margin-top:0;margin-bottom:18px">Your password has been changed.</div><% } %>
+    <% if (error) { %><div class="notice notice-bad" style="margin-top:0;margin-bottom:18px"><%= error %></div><% } %>
+
+    <form method="post" action="/profile">
+      <div class="card">
+        <h2>Your name</h2>
+        <p class="hint">Recipients see this on the documents you send, and replies come back to your address.</p>
+        <div class="field" style="margin:14px 0 0">
+          <label for="display_name">Display name</label>
+          <input id="display_name" name="display_name" type="text" value="<%= user.display_name %>" required>
+        </div>
+        <button class="btn" type="submit" style="margin-top:14px">Save</button>
+      </div>
+    </form>
+
+    <form method="post" action="/profile/password">
+      <div class="card">
+        <h2>Change your password</h2>
+        <p class="hint">At least 10 characters. Stored hashed with Argon2id — we can never read it back.</p>
+        <div class="field" style="margin-top:14px">
+          <label for="current_password">Current password</label>
+          <input id="current_password" name="current_password" type="password" required autocomplete="current-password">
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="new_password">New password</label>
+            <input id="new_password" name="new_password" type="password" required minlength="10" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label for="confirm_password">Confirm new password</label>
+            <input id="confirm_password" name="confirm_password" type="password" required minlength="10" autocomplete="new-password">
+          </div>
+        </div>
+        <button class="btn" type="submit">Change password</button>
+      </div>
+    </form>
+
+    <% if (user.role !== 'admin') { %>
+      <div class="card">
+        <h2>Organisation settings</h2>
+        <p class="hint">
+          Outgoing mail and the people on this installation are managed by an administrator. Documents you send
+          go out through the organisation's mail server, with replies coming back to <%= user.email %>.
+        </p>
+      </div>
+    <% } %>
+  </div>
+</main>
+
+<%- include('partials/foot') %>

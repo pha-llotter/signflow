@@ -1,0 +1,22 @@
+<footer class="siteftr">
+  <div class="wrap">
+    <img class="ftr-logo" src="/static/brand/logo-web.png?v=<%= v %>" alt="<%= brand.name %>" width="89" height="20">
+    <p>
+      <% if (brand.legalName) { %><%= brand.legalName %><% } %><% if (brand.regNo) { %> · Reg. No. <%= brand.regNo %><% } %>
+    </p>
+    <p class="fine">
+      Documents stored in <%= dataRegion %>. Signatures are standard electronic signatures under the
+      Electronic Communications and Transactions Act 25 of 2002, recorded with a full audit trail and a
+      SHA-256 seal. This is general information, not legal advice — a few documents (wills, the sale of
+      land, bills of exchange, long-term leases) cannot be signed electronically at all.
+    </p>
+    <% if (brand.informationOfficer || brand.popiaRegNo) { %>
+      <p class="fine">
+        POPIA Information Officer: <%= brand.informationOfficer || 'not set' %><% if (brand.popiaRegNo) { %>
+        · Registration No. <%= brand.popiaRegNo %><% } %>
+      </p>
+    <% } %>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= typeof title !== 'undefined' ? title + ' · ' : '' %><%= brand.name %></title>
+  <meta name="color-scheme" content="light dark">
+  <script>
+    /* Resolves the theme before the stylesheet paints. Inline and synchronous
+       on purpose: loading this as a separate file would let the page render in
+       the default theme first and flash white on a dark-mode device. */
+    (function () {
+      var t;
+      try { t = localStorage.getItem('signflow-theme'); } catch (e) { t = null; }
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/css/app.css?v=<%= v %>">
+  <link rel="icon" type="image/png" href="/static/brand/logo-mark.png?v=<%= v %>">
+  <link rel="apple-touch-icon" href="/static/brand/logo-mark.png?v=<%= v %>">
+</head>
+<body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">

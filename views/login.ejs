@@ -1,0 +1,35 @@
+<%- include('partials/head', { title: 'Sign in' }) %>
+<%- include('partials/nav') %>
+
+<main>
+  <div class="auth card">
+    <h1>Sign in</h1>
+    <p class="sub">to <%= brand.name %></p>
+
+    <% if (error) { %><div class="notice notice-bad" style="margin-top:0"><%= error %></div><% } %>
+
+    <form method="post" action="/login" style="margin-top:18px">
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" value="<%= email %>" required autofocus autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required autocomplete="current-password">
+      </div>
+      <button class="btn" type="submit" style="width:100%">Sign in</button>
+    </form>
+
+    <% if (firstRun) { %>
+      <div class="notice notice-warn" style="margin-top:18px">
+        No accounts exist yet. <a href="/register">Create the first one</a> — it becomes the administrator.
+      </div>
+    <% } else { %>
+      <p class="hint" style="margin-top:18px">
+        Accounts are created by invitation. If you need access, ask an administrator to invite you.
+      </p>
+    <% } %>
+  </div>
+</main>
+
+<%- include('partials/foot') %>
