@@ -52,12 +52,26 @@ if (-not $SkipTests) {
   Write-Host 'Running the suites before tagging...' -ForegroundColor Cyan
   foreach ($s in $suites) {
     Write-Host ("  {0,-14}" -f $s.name) -NoNewline
-    $out = & node $s.script @($s.args) 2>&1 | Out-String
-    $m = [regex]::Match($out, '(\d+) passed, 0 failed')
-    if (-not $m.Success) {
+
+    # Output goes to files, and the verdict comes from the exit code.
+    # Piping a native command's stderr with 2>&1 makes Windows PowerShell wrap
+    # every line as an ErrorRecord and report failure even when the process
+    # exited 0, which is exactly how a passing suite looks like a broken one.
+    $log = Join-Path $env:TEMP ("release-" + $s.name + ".log")
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & node $s.script @($s.args) > $log 2> ($log + '.err')
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+
+    $out = (Get-Content $log -Raw -ErrorAction SilentlyContinue) +
+           (Get-Content ($log + '.err') -Raw -ErrorAction SilentlyContinue)
+    $m = [regex]::Match([string]$out, '(\d+) passed, 0 failed')
+
+    if ($code -ne 0 -or -not $m.Success) {
       Write-Host '  FAILED' -ForegroundColor Red
-      Write-Host ($out -split "`n" | Select-Object -Last 25 | Out-String)
-      throw "$($s.name) did not pass. Fix it, or pass -SkipTests if you are certain."
+      Write-Host (([string]$out -split "`n" | Select-Object -Last 25) -join "`n")
+      throw "$($s.name) did not pass (exit $code). Fix it, or pass -SkipTests if you are certain."
     }
     Write-Host ("  " + $m.Value) -ForegroundColor DarkGray
   }
