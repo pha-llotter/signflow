@@ -3,7 +3,7 @@
   Takes a restorable checkpoint of the whole SignFlow installation.
 
 .DESCRIPTION
-  Writes a timestamped .zip to ..\signflow-backups — deliberately outside the
+  Writes a timestamped .zip to ..\signflow-backups - deliberately outside the
   project, so a bad restore cannot destroy the backups along with it.
 
   Included: all source, views, styles, scripts, brand assets, package-lock.json,
@@ -70,7 +70,7 @@ Label        : $(if ($Label) { $Label } else { '(none)' })
 Node         : $(node -v)
 
 CONTAINS SECRETS. .env holds SESSION_SECRET and APP_KEY. APP_KEY decrypts the
-stored SMTP password — without it that password is unrecoverable, and with it
+stored SMTP password - without it that password is unrecoverable, and with it
 anyone holding this zip can read it. Keep this file as protected as the server.
 
 Also contains storage/ : the SQLite database (accounts, documents, audit
