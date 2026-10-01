@@ -1,0 +1,42 @@
+    </main>
+    <%- include('foot-inner') %>
+  </div>
+</div>
+
+<script src="/static/js/theme.js?v=<%= v %>" defer></script>
+<script>
+  // The sidebar is a drawer below 900px. Kept inline and tiny: it must work on
+  // the very first paint, before any deferred script has run.
+  (function () {
+    var bar = document.getElementById('sidebar');
+    var btn = document.getElementById('sidebar-toggle');
+    var scrim = null;
+    if (!bar || !btn) return;
+
+    function close() {
+      bar.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      if (scrim) { scrim.remove(); scrim = null; }
+    }
+    function open() {
+      bar.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      scrim = document.createElement('div');
+      scrim.className = 'sidebar-scrim';
+      scrim.addEventListener('click', close);
+      document.body.appendChild(scrim);
+    }
+    btn.addEventListener('click', function () {
+      bar.classList.contains('open') ? close() : open();
+    });
+    // Following a link should not leave the drawer open behind the new page,
+    // and widening the window must not strand the scrim over everything.
+    bar.addEventListener('click', function (e) { if (e.target.closest('a')) close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    window.addEventListener('resize', function () {
+      if (getComputedStyle(btn).display === 'none') close();
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,7 +1,6 @@
 <%- include('partials/head', { title: 'Create account' }) %>
-<%- include('partials/nav') %>
+<%- include('partials/pub-start') %>
 
-<main>
   <div class="auth card">
     <h1>Create the administrator</h1>
     <p class="sub">
@@ -17,7 +16,7 @@
         <input id="display_name" name="display_name" type="text" value="<%= values.display_name || '' %>" required autofocus>
       </div>
       <div class="field">
-        <label for="org_name">Organisation <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label>
+        <label for="org_name">Organisation <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
         <input id="org_name" name="org_name" type="text" value="<%= values.org_name || '' %>">
       </div>
       <div class="field">
@@ -34,6 +33,4 @@
 
     <p class="hint" style="margin-top:18px">Already have an account? <a href="/login">Sign in</a>.</p>
   </div>
-</main>
-
-<%- include('partials/foot') %>
+<%- include('partials/pub-end') %>

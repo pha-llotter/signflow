@@ -78,6 +78,32 @@ try {
   await page.tap('form[action="/register"] button[type=submit]');
   await page.waitForURL('**/team');
 
+  // --- the sidebar drawer --------------------------------------------------
+  await page.goto(`${BASE}/documents`);
+  check('the sidebar is tucked away on a phone',
+    !(await page.locator('.sidebar').evaluate((n) => n.classList.contains('open'))) &&
+    (await page.locator('#sidebar-toggle').isVisible()));
+
+  await page.tap('#sidebar-toggle');
+  await page.waitForTimeout(320);
+  const openedOn = await page.locator('.sidebar').evaluate((n) => Math.round(n.getBoundingClientRect().left));
+  check('tapping the menu slides the sidebar in', openedOn >= -2, `sidebar left edge at ${openedOn}px`);
+  check('navigation is reachable from the drawer',
+    (await page.locator('.sidebar a[href="/team"]').isVisible()) &&
+    (await page.locator('.sidebar a[href="/settings"]').isVisible()));
+
+  // Tap the exposed strip beside the open drawer, not the scrim's centre —
+  // its centre is underneath the drawer, which is where a real thumb would
+  // never land anyway.
+  const vw = page.viewportSize().width;
+  const barRight = await page.locator('.sidebar').evaluate((n) => n.getBoundingClientRect().right);
+  check('enough of the page is left exposed to tap out of the drawer',
+    vw - barRight > 60, `only ${Math.round(vw - barRight)}px exposed`);
+  await page.touchscreen.tap(barRight + (vw - barRight) / 2, 400);
+  await page.waitForTimeout(320);
+  check('tapping outside closes the drawer again',
+    (await page.locator('.sidebar').evaluate((n) => Math.round(n.getBoundingClientRect().right))) < 2);
+
   await page.goto(`${BASE}/documents/new`);
   await page.setInputFiles('input[type=file]', {
     name: 'policy.pdf', mimeType: 'application/pdf', buffer: await makePdf(),

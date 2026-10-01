@@ -1,14 +1,11 @@
 <%- include('partials/head', { title: 'Error ' + code }) %>
-<%- include('partials/nav') %>
+<%- include('partials/pub-start') %>
 
-<main>
   <div class="wrap-narrow" style="margin-top:50px">
     <div class="card" style="text-align:center;padding:40px 30px">
-      <div style="font-size:32px;font-weight:700;color:var(--ink-3)"><%= code %></div>
+      <div style="font-size:32px;font-weight:700;color:var(--text-3)"><%= code %></div>
       <p style="margin:10px 0 20px"><%= message %></p>
       <a class="btn btn-ghost" href="/">Back to the start</a>
     </div>
   </div>
-</main>
-
-<%- include('partials/foot') %>
+<%- include('partials/pub-end') %>

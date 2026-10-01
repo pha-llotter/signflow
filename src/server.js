@@ -75,6 +75,8 @@ app.use((req, res, next) => {
   res.locals.dataRegion = config.dataRegion;
   res.locals.v = ASSET_VERSION;
   res.locals.appVersion = version;
+  // Lets the sidebar mark the current section without each view passing it in.
+  res.locals.path = req.path;
   // The dropzone rejects oversized files before uploading them, so it needs the
   // same limit multer enforces — derived from it rather than restated.
   res.locals.maxUploadMb = Math.round(config.maxUploadBytes / 1024 / 1024);

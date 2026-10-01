@@ -98,9 +98,11 @@ try {
   await page.waitForURL('**/team');
   check('the founding account is created and is an administrator', page.url().endsWith('/team'));
 
-  check('an administrator sees Team and Settings in the nav',
-    (await page.locator('.topbar nav a[href="/team"]').count()) === 1 &&
-    (await page.locator('.topbar nav a[href="/settings"]').count()) === 1);
+  // Asserted on the navigation region rather than a specific bar, so moving the
+  // chrome around does not look like a permissions regression.
+  check('an administrator sees Team and Settings in the navigation',
+    (await page.locator('nav a[href="/team"]').count()) >= 1 &&
+    (await page.locator('nav a[href="/settings"]').count()) >= 1);
 
   await page.goto(`${BASE}/documents`);
 
@@ -110,11 +112,16 @@ try {
   // exactly the kind of break that looks fine in a unit test.
   for (const [label, width, height] of [['desktop', 1600, 1000], ['mobile', 390, 844]]) {
     await page.setViewportSize({ width, height });
-    await page.goto(`${BASE}/login`);
+    // /documents, not /login: this context is signed in, and /login would
+    // redirect — measuring a page the test did not think it was on.
+    await page.goto(`${BASE}/documents`);
     await page.waitForLoadState('networkidle');
 
     const m = await page.evaluate(() => {
-      const img = document.querySelector('.brand img');
+      // Whichever brand mark is actually on screen: the sidebar's at desktop
+      // width, the mobile bar's below it.
+      const img = [...document.querySelectorAll('.side-brand img, .brand img')]
+        .find((el) => el.getBoundingClientRect().height > 0);
       const ftr = document.querySelector('.siteftr');
       return {
         logoH: img ? Math.round(img.getBoundingClientRect().height) : -1,

@@ -74,7 +74,10 @@ async function measure(page, touch) {
 
     /** Panels parked off-canvas on purpose are not overflow. */
     const isDeliberatelyOffscreen = (el) =>
-      !!el.closest('.palette:not(.open), .inspector:not(.open), .sign-side:not(.open), .modal-back');
+      !!el.closest(
+        '.sidebar:not(.open), .palette:not(.open), .inspector:not(.open), ' +
+        '.sign-side:not(.open), .modal-back'
+      );
 
     const overflowing = [];
     for (const el of document.querySelectorAll('body *')) {
@@ -216,7 +219,13 @@ try {
   await page.waitForURL('**/prepare');
   const docId = page.url().match(/documents\/([0-9a-f-]{36})/)[1];
 
-  await page.waitForSelector('.pdf-page canvas', { timeout: 20000 });
+  // Pages are appended one at a time as each finishes rendering, so waiting for
+  // the first canvas and then indexing the second is a race.
+  await page.waitForFunction(
+    () => document.querySelectorAll('.pdf-page canvas').length >= 2,
+    null,
+    { timeout: 25000 }
+  );
   await page.evaluate(() => {
     const holder = document.querySelectorAll('.pdf-page')[1];
     const rect = holder.getBoundingClientRect();

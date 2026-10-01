@@ -28,10 +28,10 @@
       has asked you to sign this.
     </p>
     <% if (doc.message) { %>
-      <div class="notice" style="background:var(--line-2);border-color:var(--line);color:var(--ink-2)"><%= doc.message %></div>
+      <div class="notice" style="background:var(--surface-2);border-color:var(--border);color:var(--text-2)"><%= doc.message %></div>
     <% } %>
 
-    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:22px 0 8px">
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);margin:22px 0 8px">
       Your fields (<span id="done-count">0</span> of <%= myFields.length %>)
     </h3>
     <ul class="todo-list" id="todo-list">
@@ -43,8 +43,8 @@
       <% }); %>
     </ul>
 
-    <div class="notice" style="background:#f7f8fa;border-color:var(--line);color:var(--ink-2);font-size:12.5px;line-height:1.5">
-      <strong style="display:block;margin-bottom:5px;color:var(--ink)">Before you sign</strong>
+    <div class="notice" style="background:var(--surface-2);border-color:var(--border);color:var(--text-2);font-size:12.5px;line-height:1.5">
+      <strong style="display:block;margin-bottom:5px;color:var(--text)">Before you sign</strong>
       Signing this records your name, email address, IP address, browser and the time of every step, and seals
       that record to the document with a SHA-256 hash. It is kept as evidence that you signed, and stored in
       <%= dataRegion %>. This is processed under the Electronic Communications and Transactions Act and POPIA.

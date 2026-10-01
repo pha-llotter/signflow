@@ -1,7 +1,6 @@
 <%- include('partials/head', { title: 'Settings' }) %>
-<%- include('partials/nav') %>
+<%- include('partials/shell-start') %>
 
-<main>
   <div class="wrap" style="max-width:720px">
     <div class="page-head">
       <div>
@@ -68,8 +67,8 @@
           <span>Use TLS from the first byte (port 465). Leave off for STARTTLS on 587.</span>
         </label>
 
-        <div class="notice" style="background:var(--hover);border-color:var(--line);color:var(--ink-2);margin-top:16px">
-          <strong style="display:block;margin-bottom:5px;color:var(--ink)">How a recipient sees it</strong>
+        <div class="notice" style="background:var(--surface-2);border-color:var(--border);color:var(--text-2);margin-top:16px">
+          <strong style="display:block;margin-bottom:5px;color:var(--text)">How a recipient sees it</strong>
           Mail is sent from the one address above, because most servers reject a From they do not own. The
           <em>display name</em> is whoever sent the document, and <strong>Reply-To is set to their own address</strong>,
           so a recipient sees a name they recognise and replies reach the right person.
@@ -127,6 +126,4 @@
       <% } %>
     </div>
   </div>
-</main>
-
-<%- include('partials/foot') %>
+<%- include('partials/shell-end') %>

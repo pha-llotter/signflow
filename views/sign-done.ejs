@@ -1,13 +1,12 @@
 <%- include('partials/head', { title: 'Signed' }) %>
-<%- include('partials/nav') %>
+<%- include('partials/pub-start') %>
 
-<main>
   <div class="wrap-narrow" style="margin-top:50px">
     <div class="card" style="text-align:center;padding:40px 30px">
       <div style="font-size:42px;line-height:1">✓</div>
       <h1 style="font-size:22px;margin:12px 0 6px">Signed</h1>
       <p class="hint" style="font-size:14px">
-        Your signature on <strong style="color:var(--ink)"><%= doc.title %></strong> was recorded on
+        Your signature on <strong style="color:var(--text)"><%= doc.title %></strong> was recorded on
         <%= new Date(recipient.signed_at).toLocaleString() %>.
       </p>
 
@@ -32,6 +31,4 @@
       </p>
     </div>
   </div>
-</main>
-
-<%- include('partials/foot') %>
+<%- include('partials/pub-end') %>

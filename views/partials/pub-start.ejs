@@ -1,0 +1,22 @@
+<div class="pub">
+  <header class="pub-bar">
+    <%# Signed in, the logo goes to your own work; signed out, to the public
+        verification page at the root. %>
+    <a class="brand" href="<%= user ? '/documents' : '/' %>">
+      <img src="/static/brand/logo-web.png?v=<%= v %>" alt="<%= brand.name %>" width="98" height="22">
+    </a>
+    <nav>
+      <% if (user) { %>
+        <a href="/documents">Documents</a>
+      <% } else { %>
+        <a href="/login">Sign in</a>
+      <% } %>
+    </nav>
+    <%- include('theme-toggle') %>
+  </header>
+
+  <% if (typeof flash !== 'undefined' && flash) { %>
+    <div class="wrap"><div class="flash flash-<%= flash.type %>"><%= flash.text %></div></div>
+  <% } %>
+
+  <main>

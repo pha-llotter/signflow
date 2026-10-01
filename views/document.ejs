@@ -1,7 +1,6 @@
 <%- include('partials/head', { title: doc.title }) %>
-<%- include('partials/nav') %>
+<%- include('partials/shell-start') %>
 
-<main>
   <div class="wrap">
     <div class="page-head">
       <div>
@@ -109,7 +108,6 @@
       </form>
     </div>
   </div>
-</main>
 
 <script>
   document.querySelectorAll('.copy-link').forEach((b) => {
@@ -122,4 +120,4 @@
   });
 </script>
 
-<%- include('partials/foot') %>
+<%- include('partials/shell-end') %>

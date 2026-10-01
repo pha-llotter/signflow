@@ -1,7 +1,6 @@
 <%- include('partials/head', { title: 'Documents' }) %>
-<%- include('partials/nav') %>
+<%- include('partials/shell-start') %>
 
-<main>
   <div class="wrap">
     <div class="page-head">
       <div>
@@ -31,7 +30,7 @@
     <div class="card" style="padding:14px 8px">
       <% if (!docs.length) { %>
         <div class="empty">
-          <p style="font-size:16px;margin:0 0 6px;color:var(--ink-2)">Nothing here yet.</p>
+          <p style="font-size:16px;margin:0 0 6px;color:var(--text-2)">Nothing here yet.</p>
           <p style="margin:0 0 20px">Upload a PDF, drop the fields where they belong, and send it.</p>
           <a class="btn" href="/documents/new">Send your first document</a>
         </div>
@@ -44,7 +43,7 @@
             <% docs.forEach(function (d) { %>
               <tr>
                 <td class="td-primary">
-                  <a href="/documents/<%= d.id %>" style="font-weight:600;color:var(--ink)"><%= d.title %></a>
+                  <a href="/documents/<%= d.id %>" style="font-weight:600;color:var(--text)"><%= d.title %></a>
                   <div class="hint" style="margin:2px 0 0"><%= d.filename %> · <%= d.page_count %> page<%= d.page_count === 1 ? '' : 's' %></div>
                 </td>
                 <td data-label="Status"><span class="pill pill-<%= d.status %>"><%= d.status %></span></td>
@@ -66,6 +65,5 @@
       <% } %>
     </div>
   </div>
-</main>
 
-<%- include('partials/foot') %>
+<%- include('partials/shell-end') %>

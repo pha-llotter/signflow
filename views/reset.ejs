@@ -1,7 +1,6 @@
 <%- include('partials/head', { title: 'Set a new password' }) %>
-<%- include('partials/nav') %>
+<%- include('partials/pub-start') %>
 
-<main>
   <div class="auth card">
     <h1>Set a new password</h1>
     <p class="sub">for <%= user.email %></p>
@@ -25,6 +24,4 @@
       This link works once, and only until it expires. Your old password stops working straight away.
     </p>
   </div>
-</main>
-
-<%- include('partials/foot') %>
+<%- include('partials/pub-end') %>

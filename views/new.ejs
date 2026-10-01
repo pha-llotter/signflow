@@ -1,7 +1,6 @@
 <%- include('partials/head', { title: 'New document' }) %>
-<%- include('partials/nav') %>
+<%- include('partials/shell-start') %>
 
-<main>
   <div class="wrap" style="max-width:720px">
     <div class="page-head">
       <div>
@@ -31,7 +30,7 @@
           <input id="title" name="title" type="text" placeholder="Leave blank to use the file name">
         </div>
         <div class="field" style="margin-bottom:0">
-          <label for="message">Message to recipients <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label>
+          <label for="message">Message to recipients <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
           <textarea id="message" name="message" placeholder="Appears in the invitation email."></textarea>
         </div>
       </div>
@@ -71,7 +70,6 @@
       </div>
     </form>
   </div>
-</main>
 
 <script src="/static/js/dropzone.js?v=<%= v %>" defer></script>
 <script>
@@ -90,4 +88,4 @@
   });
 </script>
 
-<%- include('partials/foot') %>
+<%- include('partials/shell-end') %>
