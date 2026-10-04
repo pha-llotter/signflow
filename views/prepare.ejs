@@ -3,6 +3,17 @@
 
 <%- include('partials/support-banner') %>
 <div class="placer" id="placer">
+  <%- include('partials/steps', { compact: true, steps: isTemplate ? [
+    { label: 'Upload form', state: 'done' },
+    { label: 'Name the roles', state: 'done' },
+    { label: 'Place fields', state: 'current' },
+    { label: 'Save template', state: 'todo' },
+  ] : [
+    { label: doc.template_id ? 'Choose template' : 'Upload document', state: 'done' },
+    { label: 'Add recipients', state: 'done' },
+    { label: 'Place fields', state: 'current' },
+    { label: 'Send', state: 'todo' },
+  ] }) %>
   <div class="placer-bar">
     <a class="brand brand-compact" href="<%= isTemplate ? '/templates' : '/documents' %>" title="<%= isTemplate ? 'Back to templates' : 'Back to documents' %>">
       <img src="/static/brand/logo-mark.png?v=<%= v %>" alt="<%= brand.name %>" width="24" height="24">

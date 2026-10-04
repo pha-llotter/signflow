@@ -629,7 +629,8 @@ tbody tr:hover td { background: var(--surface-2); }
 
 /* ====================================================== the field placer === */
 
-.placer { display: grid; grid-template-columns: 236px 1fr 272px; grid-template-rows: auto 1fr; flex: 1; min-height: 0; }
+.placer { display: grid; grid-template-columns: 236px 1fr 272px; grid-template-rows: auto auto 1fr; flex: 1; min-height: 0; }
+.placer > .steps { grid-column: 1 / -1; }
 body.no-scroll { display: flex; flex-direction: column; }
 
 .placer-bar {
@@ -994,6 +995,57 @@ body.no-scroll { display: flex; flex-direction: column; }
 .tab-count { font-size: 12px; font-weight: 700; opacity: .75; font-variant-numeric: tabular-nums; }
 /* Desktop has the top bar's search; this one only shows once that is hidden. */
 .doc-search { display: none; margin: 0 0 14px; width: 100%; }
+
+/* ------------------------------------------------------ locked sections ---- */
+
+/* A section that waits on an earlier one — recipients wait for the PDF. A
+   disabled fieldset switches off every control inside it at once. */
+fieldset.card { margin: 0; min-width: 0; }
+fieldset.card + .card, .card + fieldset.card { margin-top: 16px; }
+.lockable .lock-note { display: none; margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--brand); }
+.lockable:disabled > :not(h2):not(.lock-note) { opacity: .45; }
+.lockable:disabled .lock-note { display: block; }
+
+/* ---------------------------------------------------------- flow steps ---- */
+
+/* Where the person is in a multi-page flow: send a document, use a template,
+   make one. Done steps tick over in the brand colour, the current one is
+   filled, the rest wait in outline; short rules join them. */
+.steps {
+  list-style: none; margin: 0 0 22px; padding: 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 0;
+}
+.step { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-3); white-space: nowrap; }
+.step + .step::before {
+  content: ''; width: 28px; height: 1.5px; margin: 0 12px 0 4px;
+  background: var(--border-strong); border-radius: 1px;
+}
+.step-done + .step::before { background: var(--brand); }
+.step-dot {
+  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 1.5px solid var(--border-strong); background: var(--surface);
+  font-size: 11.5px; font-weight: 750; color: var(--text-3);
+}
+.step-dot > * { grid-area: 1 / 1; }
+.step-tick { display: none; }
+.step-done .step-dot { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
+.step-done .step-tick { display: block; }
+.step-done .step-num { display: none; }
+.step-done { color: var(--text-2); }
+.step-current .step-dot { background: var(--brand); border-color: var(--brand); color: var(--brand-fg); }
+.step-current { color: var(--text); font-weight: 650; }
+
+/* In the field editor it rides in a slim strip above the toolbar. */
+.steps-compact { margin: 0; padding: 8px 18px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.steps-compact .step { font-size: 12.5px; }
+.steps-compact .step-dot { width: 20px; height: 20px; font-size: 11px; }
+
+@media (max-width: 620px) {
+  /* A phone has room for the shape of the flow, not every label. */
+  .step:not(.step-current) .step-label { display: none; }
+  .step + .step::before { width: 16px; margin: 0 8px 0 2px; }
+}
 
 /* ------------------------------------------------------------ templates ---- */
 

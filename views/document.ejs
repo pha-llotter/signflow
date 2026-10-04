@@ -47,6 +47,33 @@
       </div>
     <% } %>
 
+    <% if (doc.status === 'sent' && !doc.deleted_at) {
+         const DAY = 864e5;
+         const next = doc.reminder_days ? new Date(Date.parse(doc.last_reminded_at || doc.sent_at) + doc.reminder_days * DAY) : null;
+         const beyond = next && doc.expires_at && next > new Date(doc.expires_at); %>
+      <div class="card">
+        <h2>Automatic reminders</h2>
+        <p class="hint">
+          <% if (!doc.reminder_days) { %>
+            Off. Use <b>Send a reminder</b> above to chase people by hand.
+          <% } else if (beyond) { %>
+            No more are due: the document expires before the next one.
+          <% } else { %>
+            Anyone who has not signed is sent their link again. Next round:
+            <b><%= next.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) %></b><% if (doc.last_reminded_at) { %>; last sent <%= new Date(doc.last_reminded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) %><% } %>.
+          <% } %>
+        </p>
+        <form method="post" action="/documents/<%= doc.id %>/reminders" class="role-row" style="margin-top:12px;max-width:420px">
+          <select id="reminder_days" name="reminder_days">
+            <% reminderChoices.forEach(function (c) { %>
+              <option value="<%= c[0] %>" <%= c[0] === doc.reminder_days ? 'selected' : '' %> <%= c[0] && c[0] >= expiryDays ? 'disabled' : '' %>><%= c[1] %></option>
+            <% }); %>
+          </select>
+          <button class="btn btn-ghost btn-sm" type="submit">Save</button>
+        </form>
+      </div>
+    <% } %>
+
     <% if (doc.status === 'completed') { %>
       <div class="card">
         <h2>Seal</h2>

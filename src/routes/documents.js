@@ -10,6 +10,7 @@ import { requireAuth, ownedDocument, canUseTemplate } from '../middleware/auth.j
 import { sha256Buffer, uuid, token } from '../crypto.js';
 import { send, invitationEmail } from '../mailer.js';
 import { mailConfigured } from '../settings-store.js';
+import { readReminderDays, fitReminderDays, expiryDaysOf, REMINDER_CHOICES } from '../reminders.js';
 
 const router = Router();
 
@@ -34,7 +35,7 @@ function receivePdf(req, res, next) {
       err.code === 'LIMIT_FILE_SIZE'
         ? `That file is larger than the ${Math.round(config.maxUploadBytes / 1024 / 1024)} MB limit.`
         : err.message || 'That upload could not be read.';
-    res.status(400).render('new', { error: message });
+    res.status(400).render('new', { reminderChoices: REMINDER_CHOICES, error: message });
   });
 }
 
@@ -67,18 +68,19 @@ router.get('/documents', requireAuth, (req, res) => {
 });
 
 router.get('/documents/new', requireAuth, (req, res) => {
-  res.render('new', { error: null });
+  res.render('new', { error: null, reminderChoices: REMINDER_CHOICES });
 });
 
 router.post('/documents/new', requireAuth, receivePdf, async (req, res, next) => {
   try {
-    if (!req.file) return res.status(400).render('new', { error: 'Choose a PDF to upload.' });
+    if (!req.file) return res.status(400).render('new', { reminderChoices: REMINDER_CHOICES, error: 'Choose a PDF to upload.' });
 
     let pdf;
     try {
       pdf = await PDFDocument.load(req.file.buffer, { ignoreEncryption: false });
     } catch {
       return res.status(400).render('new', {
+        reminderChoices: REMINDER_CHOICES,
         error: 'That PDF could not be read. Password-protected files must be unlocked first.',
       });
     }
@@ -100,8 +102,8 @@ router.post('/documents/new', requireAuth, receivePdf, async (req, res, next) =>
 
     db.prepare(
       `INSERT INTO documents (id, owner_id, title, message, filename, page_count, page_sizes,
-         original_path, original_sha256, status, signing_order, expires_at, created_at, company_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`
+         original_path, original_sha256, status, signing_order, expires_at, created_at, company_id, reminder_days)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`
     ).run(
       id,
       req.user.id,
@@ -115,7 +117,8 @@ router.post('/documents/new', requireAuth, receivePdf, async (req, res, next) =>
       req.body.signing_order ? 1 : 0,
       new Date(Date.now() + expiryDays * 864e5).toISOString(),
       nowIso(),
-      req.user.company_id
+      req.user.company_id,
+      fitReminderDays(readReminderDays(req.body.reminder_days), expiryDays)
     );
 
     audit({
@@ -141,7 +144,7 @@ router.post('/documents/new', requireAuth, receivePdf, async (req, res, next) =>
     }
 
     if (index === 0) {
-      return res.status(400).render('new', { error: 'Add at least one recipient with a name and email.' });
+      return res.status(400).render('new', { reminderChoices: REMINDER_CHOICES, error: 'Add at least one recipient with a name and email.' });
     }
 
     res.redirect(`/documents/${id}/prepare`);
@@ -203,6 +206,15 @@ router.post('/documents/:id/delete', requireAuth, ownedDocument, (req, res) => {
   res.redirect('/documents');
 });
 
+router.post('/documents/:id/reminders', requireAuth, ownedDocument, (req, res) => {
+  const days = fitReminderDays(readReminderDays(req.body.reminder_days), expiryDaysOf(req.doc));
+  db.prepare('UPDATE documents SET reminder_days = ? WHERE id = ?').run(days, req.doc.id);
+  const label = REMINDER_CHOICES.find(([d]) => d === days)[1].toLowerCase();
+  audit({ documentId: req.doc.id, actor: req.user.email, action: 'Automatic reminders changed', detail: days ? label : 'off', req });
+  req.session.flash = { type: 'ok', text: days ? `Automatic reminders: ${label}.` : 'Automatic reminders turned off.' };
+  res.redirect(`/documents/${req.doc.id}`);
+});
+
 router.post('/documents/:id/restore', requireAuth, ownedDocument, (req, res) => {
   if (req.doc.deleted_at) {
     db.prepare('UPDATE documents SET deleted_at = NULL, deleted_by = NULL WHERE id = ?').run(req.doc.id);
@@ -230,7 +242,10 @@ router.get('/documents/:id', requireAuth, ownedDocument, (req, res) => {
   const events = db
     .prepare('SELECT * FROM audit_events WHERE document_id = ? ORDER BY id DESC')
     .all(req.doc.id);
-  res.render('document', { doc: req.doc, recipients, events, baseUrl: config.baseUrl });
+  res.render('document', {
+    doc: req.doc, recipients, events, baseUrl: config.baseUrl,
+    reminderChoices: REMINDER_CHOICES, expiryDays: expiryDaysOf(req.doc),
+  });
 });
 
 /**
@@ -291,7 +306,7 @@ router.post('/documents/:id/send', requireAuth, ownedDocument, async (req, res, 
 });
 
 /** Shared by send and by the signing-order hand-off after each signature. */
-export async function inviteRecipient({ doc, recipient, sender, req = null }) {
+export async function inviteRecipient({ doc, recipient, sender, req = null, reminder = false, automatic = false }) {
   const fresh = db.prepare('SELECT * FROM recipients WHERE id = ?').get(recipient.id);
   let tok = fresh.token;
   if (!tok) {
@@ -299,15 +314,20 @@ export async function inviteRecipient({ doc, recipient, sender, req = null }) {
     db.prepare('UPDATE recipients SET token = ? WHERE id = ?').run(tok, recipient.id);
   }
   const link = `${config.baseUrl}/sign/${tok}`;
-  const mail = invitationEmail({ doc, recipient: fresh, sender, link });
+  const mail = invitationEmail({ doc, recipient: fresh, sender, link, reminder });
   const result = await send(sender, { to: `"${fresh.name}" <${fresh.email}>`, ...mail });
 
+  // An automatic reminder was sent by nobody in particular; the trail says so
+  // rather than putting the sender's name to an email they did not send.
+  const what = automatic ? 'Automatic reminder' : reminder ? 'Reminder' : 'Invitation';
   audit({
     documentId: doc.id,
     recipientId: fresh.id,
-    actor: sender.email,
-    action: result.delivered ? 'Email sent' : 'Email not delivered',
-    detail: result.delivered ? `Invitation to ${fresh.email}` : `${fresh.email} — ${result.reason}`,
+    actor: automatic ? 'SignFlow (automatic)' : sender.email,
+    action: automatic
+      ? (result.delivered ? 'Automatic reminder sent' : 'Automatic reminder not delivered')
+      : (result.delivered ? 'Email sent' : 'Email not delivered'),
+    detail: result.delivered ? `${what} to ${fresh.email}` : `${fresh.email} — ${result.reason}`,
     req,
   });
   return result;
@@ -321,7 +341,7 @@ router.post('/documents/:id/remind', requireAuth, ownedDocument, async (req, res
     .prepare(`SELECT * FROM recipients WHERE document_id = ? AND status IN ('pending','viewed') ORDER BY order_index`)
     .all(req.doc.id);
   const target = req.doc.signing_order ? pending.slice(0, 1) : pending;
-  for (const r of target) await inviteRecipient({ doc: req.doc, recipient: r, sender: req.user, req });
+  for (const r of target) await inviteRecipient({ doc: req.doc, recipient: r, sender: req.user, req, reminder: true });
   req.session.flash = { type: 'ok', text: `Reminder sent to ${target.length} recipient(s).` };
   res.redirect(`/documents/${req.doc.id}`);
 });

@@ -2,6 +2,14 @@
 <%- include('partials/shell-start') %>
 
   <div class="wrap" style="max-width:720px">
+    <% if (mode === 'new') { %>
+      <%- include('partials/steps', { steps: [
+        { label: 'Upload form', state: 'current' },
+        { label: 'Name the roles', state: 'todo' },
+        { label: 'Place fields', state: 'todo' },
+        { label: 'Save template', state: 'todo' },
+      ] }) %>
+    <% } %>
     <div class="page-head">
       <div>
         <h1><%= mode === 'new' ? 'New template' : 'Template details' %></h1>
@@ -109,5 +117,33 @@
     if (list.children.length > 1) e.target.closest('.role-row').remove();
   });
 </script>
+
+<% if (mode === 'new') { %>
+<script>
+  // Upload and the next step share this page, so the indicator moves on as
+  // soon as a file is chosen — and back if it is removed. Driven by the
+  // dropzone's settled state, which also covers a dropped, removed or
+  // rejected file.
+  (function () {
+    var input = document.getElementById('pdf-input');
+    var steps = document.querySelectorAll('.steps .step');
+    if (!input || steps.length < 2) return;
+    function set(el, state) {
+      el.classList.remove('step-done', 'step-current', 'step-todo');
+      el.classList.add('step-' + state);
+      if (state === 'current') el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current');
+    }
+    function sync() {
+      var chosen = input.files && input.files.length > 0;
+      var lock = document.getElementById('recipients-card');
+      if (lock) lock.disabled = !chosen;
+      set(steps[0], chosen ? 'done' : 'current');
+      set(steps[1], chosen ? 'current' : 'todo');
+    }
+    document.addEventListener('dropzone:change', sync);
+    sync();
+  })();
+</script>
+<% } %>
 
 <%- include('partials/shell-end') %>

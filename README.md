@@ -241,6 +241,19 @@ recorded hash, or upload a PDF and have it hashed and matched:
 Both are mounted from the same handlers in `src/routes/verify.js`; only the frame
 and the form addresses differ.
 
+## Automatic reminders
+
+Each document has a reminder schedule, chosen when it is sent — off, every day, 2
+days, 3 days (the default) or weekly — and changeable on the document page while it
+is out. A sweep every 15 minutes (`REMINDER_SWEEP_MS` to change it) sends anyone who
+has not signed their link again once the interval has passed since it was sent or
+last chased. With signing order on, only the person whose turn it is is reminded.
+It stops on its own when the document is completed, declined, expired or trashed,
+and pauses while the company is suspended or the sender deactivated. Each round is
+claimed with a conditional update before any mail goes out, so overlapping sweeps or
+a mid-sweep change can never send a round twice; each reminder is in the audit trail
+as an automatic one.
+
 ## Trash
 
 Deleting a document moves it to the **trash** first. It leaves every list and the

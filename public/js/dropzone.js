@@ -50,13 +50,18 @@ function setup(zone) {
       idle.hidden = false;
       summary.hidden = true;
       zone.classList.remove('has-file');
-      return;
+    } else {
+      nameEl.textContent = file.name;
+      metaEl.textContent = `${formatBytes(file.size)}${file.type ? ` · ${file.type}` : ''}`;
+      idle.hidden = true;
+      summary.hidden = false;
+      zone.classList.add('has-file');
     }
-    nameEl.textContent = file.name;
-    metaEl.textContent = `${formatBytes(file.size)}${file.type ? ` · ${file.type}` : ''}`;
-    idle.hidden = true;
-    summary.hidden = false;
-    zone.classList.add('has-file');
+    // The settled state, after validation: a dropped file, a removed one or a
+    // rejected one never fires the input's own change event, and a rejected
+    // pick fires it before it is cleared. Anything that depends on "is there a
+    // file?" listens for this instead.
+    zone.dispatchEvent(new CustomEvent('dropzone:change', { bubbles: true, detail: { file: file || null } }));
   }
 
   /** Returns false and explains why, rather than silently ignoring the file. */

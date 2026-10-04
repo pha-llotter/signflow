@@ -25,7 +25,9 @@ const PORT = 3993, BASE = `http://127.0.0.1:${PORT}`;
 const DB = path.join(TMP, 'a.db');
 const server = spawn(process.execPath, ['src/server.js'], { cwd: ROOT,
   env: { ...process.env, PORT: String(PORT), BASE_URL: BASE, STORAGE_DIR: TMP, DB_PATH: DB,
-    SESSION_SECRET: crypto.randomBytes(32).toString('hex'), APP_KEY: crypto.randomBytes(32).toString('hex') }, stdio: ['ignore', 'pipe', 'pipe'] });
+    SESSION_SECRET: crypto.randomBytes(32).toString('hex'), APP_KEY: crypto.randomBytes(32).toString('hex'),
+    // Reminders are swept every 15 minutes in real life; here, fast enough to watch.
+    REMINDER_SWEEP_MS: '400' }, stdio: ['ignore', 'pipe', 'pipe'] });
 let log = ''; server.stdout.on('data', (d) => (log += d)); server.stderr.on('data', (d) => (log += d));
 for (let i = 0; i < 100; i++) { try { await fetch(`${BASE}/login`); break; } catch { await new Promise((r) => setTimeout(r, 150)); } }
 
@@ -342,6 +344,74 @@ try {
   check('in-app upload check gives the same result', /sealed document exactly as it was issued/.test(page) && page.includes('class="sidebar"'));
   page = await text(head3, `/verification/${branded.id}`);
   check('in-app link by ID works too', page.includes('Branded certificate') && page.includes('class="sidebar"'));
+
+  console.log('\nautomatic reminders');
+  const sweep = () => new Promise((r) => setTimeout(r, 1300));
+  const daysAgo = (n) => new Date(Date.now() - n * 864e5).toISOString();
+  const autoReminders = (id) => db.prepare(`SELECT * FROM audit_events WHERE document_id = ? AND action IN ('Automatic reminder sent', 'Automatic reminder not delivered') ORDER BY id`).all(id);
+  const rem = await sendDoc(head3, 'Remind me', 'Slow Signer', 'slow@riverside.test');
+  check('a document is sent with reminders every 3 days by default', docRow(rem.id).reminder_days === 3);
+  await sweep();
+  check('nothing is sent before the first interval has passed', autoReminders(rem.id).length === 0);
+  db.prepare('UPDATE documents SET sent_at = ? WHERE id = ?').run(daysAgo(4), rem.id);
+  await sweep();
+  let rounds = autoReminders(rem.id);
+  check('once due, the unsigned recipient is reminded automatically', rounds.length === 1 && rounds[0].actor === 'SignFlow (automatic)' && !!docRow(rem.id).last_reminded_at, JSON.stringify(rounds.map((r) => [r.actor, r.action])));
+  await sweep();
+  check('...once per interval, not on every sweep', autoReminders(rem.id).length === 1);
+  db.prepare('UPDATE documents SET last_reminded_at = ? WHERE id = ?').run(daysAgo(4), rem.id);
+  await sweep();
+  check('the next interval brings the next round', autoReminders(rem.id).length === 2);
+
+  page = await text(head3, `/documents/${rem.id}`);
+  check('the document page shows the schedule and the next round', page.includes('Automatic reminders') && page.includes('Next round'));
+  await head3('POST', `/documents/${rem.id}/reminders`, form({ reminder_days: '0' }));
+  db.prepare('UPDATE documents SET last_reminded_at = ? WHERE id = ?').run(daysAgo(30), rem.id);
+  await sweep();
+  check('turning them off stops them', docRow(rem.id).reminder_days === 0 && autoReminders(rem.id).length === 2, `reminder_days=${docRow(rem.id).reminder_days} rounds=${autoReminders(rem.id).length}`);
+  check('...and the change is in the audit trail', !!db.prepare(`SELECT 1 FROM audit_events WHERE document_id = ? AND action = 'Automatic reminders changed'`).get(rem.id));
+  check('another company cannot change them', (await owner('POST', `/documents/${rem.id}/reminders`, form({ reminder_days: '1' }))).status === 404 && docRow(rem.id).reminder_days === 0);
+
+  // An interval must be shorter than the time allowed to sign.
+  const draftWith = async (expires, reminder) => {
+    const fd = new FormData();
+    fd.append('pdf', new Blob([await pdf()], { type: 'application/pdf' }), 'e.pdf');
+    fd.append('title', `Expires in ${expires}`); fd.append('expires_in_days', String(expires)); fd.append('reminder_days', String(reminder));
+    fd.append('recipient_name', 'E'); fd.append('recipient_email', 'e@riverside.test');
+    return (loc(await head3('POST', '/documents/new', { body: fd })).match(/documents\/([0-9a-f-]{36})/) || [])[1];
+  };
+  check('a 1-day expiry cannot have reminders every 3 days: they are turned off', docRow(await draftWith(1, 3)).reminder_days === 0);
+  check('a 3-day expiry asking for weekly gets the longest that fits (every 2 days)', docRow(await draftWith(3, 7)).reminder_days === 2);
+  check('an interval that fits is kept as chosen', docRow(await draftWith(30, 7)).reminder_days === 7);
+  const shortDoc = await draftWith(2, 1);
+  await head3('POST', `/documents/${shortDoc}/reminders`, form({ reminder_days: '7' }));
+  check('the document page cannot set one longer than the document allows either', docRow(shortDoc).reminder_days === 1);
+
+  // Signing order: only the person whose turn it is.
+  const ofd = new FormData();
+  ofd.append('pdf', new Blob([await pdf()], { type: 'application/pdf' }), 'o.pdf');
+  ofd.append('title', 'In order'); ofd.append('signing_order', '1'); ofd.append('reminder_days', '1');
+  for (const [n, e] of [['First', 'first@riverside.test'], ['Second', 'second@riverside.test']]) { ofd.append('recipient_name', n); ofd.append('recipient_email', e); }
+  const ordId = (loc(await head3('POST', '/documents/new', { body: ofd })).match(/documents\/([0-9a-f-]{36})/) || [])[1];
+  const firstRid = (await text(head3, `/documents/${ordId}/prepare`)).match(/data-id="([0-9a-f-]{36})"/)[1];
+  await head3('PUT', `/api/documents/${ordId}/fields`, { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fields: [{ id: crypto.randomUUID(), type: 'signature', recipient_id: firstRid, page: 0, x: .2, y: .6, w: .3, h: .08 }] }) });
+  await head3('POST', `/documents/${ordId}/send`);
+  check('the chosen interval is kept', docRow(ordId).reminder_days === 1);
+  db.prepare('UPDATE documents SET sent_at = ? WHERE id = ?').run(daysAgo(2), ordId);
+  await sweep();
+  rounds = autoReminders(ordId);
+  check('with signing order on, only the person whose turn it is is reminded', rounds.length === 1 && rounds[0].recipient_id === firstRid, JSON.stringify(rounds.map((r) => r.recipient_id)));
+
+  // Nothing in the trash, and nothing already signed, is chased.
+  const quiet = await sendDoc(head3, 'Quiet please', 'Q', 'q@riverside.test');
+  await head3('POST', `/documents/${quiet.id}/delete`);
+  db.prepare('UPDATE documents SET sent_at = ? WHERE id = ?').run(daysAgo(10), quiet.id);
+  const done = await sendDoc(head3, 'Already signed', 'D', 'd@riverside.test');
+  await fetch(`${BASE}/sign/${done.tok}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ consent: true, values: { [done.fid]: PNG_DATA } }) });
+  db.prepare('UPDATE documents SET sent_at = ? WHERE id = ?').run(daysAgo(10), done.id);
+  await sweep();
+  check('a trashed document is not chased', autoReminders(quiet.id).length === 0);
+  check('a completed document is not chased', docRow(done.id).status === 'completed' && autoReminders(done.id).length === 0);
 
   console.log('\ndeleting a company');
   await owner('POST', '/platform/companies', form({ name: 'Doomed Ltd', admin_email: 'boss@doomed.test' }));

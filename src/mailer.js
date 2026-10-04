@@ -122,7 +122,8 @@ function compose({ subject, heading, paragraphs, lines, cta, panels, note, attac
   };
 }
 
-export function invitationEmail({ doc, recipient, sender, link }) {
+/** `reminder` re-sends the same link, worded as a nudge rather than a first request. */
+export function invitationEmail({ doc, recipient, sender, link, reminder = false }) {
   const who = `${esc(sender.display_name)}${sender.org_name ? ` (${esc(sender.org_name)})` : ''}`;
   const expires = doc.expires_at
     ? new Date(doc.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -132,15 +133,19 @@ export function invitationEmail({ doc, recipient, sender, link }) {
   if (expires) panels.push({ label: 'Please sign before', value: expires });
 
   return compose({
-    subject: `Please sign: ${doc.title}`,
-    heading: 'You have a document to sign',
+    subject: reminder ? `Reminder — please sign: ${doc.title}` : `Please sign: ${doc.title}`,
+    heading: reminder ? 'A reminder to sign' : 'You have a document to sign',
     paragraphs: [
-      `<strong>${who}</strong> has sent you <strong>${esc(doc.title)}</strong> to review and sign.`,
+      reminder
+        ? `<strong>${who}</strong> sent you <strong>${esc(doc.title)}</strong> to sign, and it is still waiting for your signature.`
+        : `<strong>${who}</strong> has sent you <strong>${esc(doc.title)}</strong> to review and sign.`,
       ...(doc.message ? [`<em>&ldquo;${esc(doc.message)}&rdquo;</em>`] : []),
       'You do not need an account. The link below opens the document in your browser and walks you through the fields addressed to you.',
     ],
     lines: [
-      `${sender.display_name}${sender.org_name ? ` (${sender.org_name})` : ''} has sent you "${doc.title}" to review and sign.`,
+      reminder
+        ? `Reminder: ${sender.display_name}${sender.org_name ? ` (${sender.org_name})` : ''} sent you "${doc.title}" to sign, and it is still waiting for your signature.`
+        : `${sender.display_name}${sender.org_name ? ` (${sender.org_name})` : ''} has sent you "${doc.title}" to review and sign.`,
       ...(doc.message ? ['', `"${doc.message}"`] : []),
       '',
       'You do not need an account — the link below opens it in your browser.',

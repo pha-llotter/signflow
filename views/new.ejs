@@ -2,6 +2,12 @@
 <%- include('partials/shell-start') %>
 
   <div class="wrap" style="max-width:720px">
+    <%- include('partials/steps', { steps: [
+      { label: 'Upload document', state: 'current' },
+      { label: 'Add recipients', state: 'todo' },
+      { label: 'Place fields', state: 'todo' },
+      { label: 'Send', state: 'todo' },
+    ] }) %>
     <div class="page-head">
       <div>
         <h1>Send a document</h1>
@@ -36,9 +42,12 @@
         </div>
       </div>
 
-      <div class="card">
+      <%# Locked by script until a PDF is chosen; rendered open, so the form
+          still works if the script never runs. %>
+      <fieldset class="card lockable" id="recipients-card">
         <h2>Who signs</h2>
         <p class="hint">Recipients never need an account — they get a private link and sign in the browser.</p>
+        <p class="lock-note">Add a document first.</p>
 
         <div id="recipients" style="margin-top:14px">
           <div class="recipient-row">
@@ -54,15 +63,28 @@
           <input type="checkbox" name="signing_order" value="1">
           <span>Sign in order — each person is only invited once the one before them has signed.</span>
         </label>
-      </div>
+      </fieldset>
 
       <div class="card">
-        <h2>Expiry</h2>
-        <div class="field" style="max-width:200px;margin-bottom:0">
-          <label for="expires_in_days">Expires in (days)</label>
-          <input id="expires_in_days" name="expires_in_days" type="number" value="30" min="1" max="365">
+        <h2>Expiry and reminders</h2>
+        <div class="grid-2" style="margin-top:12px">
+          <div class="field" style="margin-bottom:0">
+            <label for="expires_in_days">Expires in (days)</label>
+            <input id="expires_in_days" name="expires_in_days" type="number" value="30" min="1" max="365">
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label for="reminder_days">Automatic reminders</label>
+          <select id="reminder_days" name="reminder_days">
+            <% reminderChoices.forEach(function (c) { %>
+              <option value="<%= c[0] %>" <%= c[0] === 3 ? 'selected' : '' %>><%= c[1] %></option>
+            <% }); %>
+          </select>
+          </div>
         </div>
-        <p class="hint">After this the signing links stop working and the document is marked expired.</p>
+        <p class="hint">
+          Anyone who has not signed is sent their link again on this schedule until they sign or the document
+          expires. After expiry the signing links stop working.
+        </p>
       </div>
 
       <div class="btn-row" style="margin-top:18px">
@@ -73,6 +95,7 @@
   </div>
 
 <script src="/static/js/dropzone.js?v=<%= v %>" defer></script>
+<script src="/static/js/expiry-reminders.js?v=<%= v %>" defer></script>
 <script>
   // Recipients are a repeatable row; the server reads them as parallel arrays.
   const list = document.getElementById('recipients');
@@ -87,6 +110,32 @@
     // Always leave one row standing, or there is nothing to fill in.
     if (list.children.length > 1) e.target.closest('.recipient-row').remove();
   });
+</script>
+
+<script>
+  // Upload and the next step share this page, so the indicator moves on as
+  // soon as a file is chosen — and back if it is removed. Driven by the
+  // dropzone's settled state, which also covers a dropped, removed or
+  // rejected file.
+  (function () {
+    var input = document.getElementById('pdf-input');
+    var steps = document.querySelectorAll('.steps .step');
+    if (!input || steps.length < 2) return;
+    function set(el, state) {
+      el.classList.remove('step-done', 'step-current', 'step-todo');
+      el.classList.add('step-' + state);
+      if (state === 'current') el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current');
+    }
+    function sync() {
+      var chosen = input.files && input.files.length > 0;
+      var lock = document.getElementById('recipients-card');
+      if (lock) lock.disabled = !chosen;
+      set(steps[0], chosen ? 'done' : 'current');
+      set(steps[1], chosen ? 'current' : 'todo');
+    }
+    document.addEventListener('dropzone:change', sync);
+    sync();
+  })();
 </script>
 
 <%- include('partials/shell-end') %>

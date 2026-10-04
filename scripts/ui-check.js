@@ -157,6 +157,16 @@ try {
     await page.locator('.dropzone [data-dz-idle]').isVisible() &&
     !(await page.locator('.dropzone [data-dz-file]').isVisible()));
 
+  // Recipients wait for the PDF: the whole section is a disabled fieldset
+  // until a file is chosen, however it is chosen.
+  const recipientsLocked = () => page.evaluate(() => {
+    const fs = document.getElementById('recipients-card');
+    return fs.disabled && document.querySelector('input[name=recipient_name]').matches(':disabled');
+  });
+  const currentStep = () => page.evaluate(() => document.querySelector('.steps .step-current .step-label')?.textContent);
+  check('recipients are locked until a document is added',
+    (await recipientsLocked()) && (await page.locator('#recipients-card .lock-note').isVisible()));
+
   // Simulate a real drag-and-drop. Playwright cannot drag from the OS, so the
   // file is built inside the page and dispatched through a DataTransfer —
   // exactly the path a real drop takes.
@@ -184,6 +194,7 @@ try {
   check('dropping a non-PDF is refused with a reason',
     /not a PDF/i.test(rejected || '') && !(await page.locator('[data-dz-file]').isVisible()),
     `error text: ${rejected}`);
+  check('...and a rejected file leaves recipients locked', await recipientsLocked());
 
   await dropFile('ict-policy.pdf', 'application/pdf', pdfBuffer.toString('base64'));
   const shownName = await page.locator('[data-dz-name]').textContent();
@@ -192,6 +203,8 @@ try {
     `showed "${shownName}"`);
   check('the dropped file reached the real form input',
     await page.evaluate(() => document.querySelector('#pdf-input').files.length === 1));
+  check('dropping a PDF unlocks recipients and moves the steps on',
+    !(await recipientsLocked()) && (await currentStep()) === 'Add recipients', `current step: ${await currentStep()}`);
   await page.locator('.card').first().screenshot({ path: path.join(OUT, '0-dropzone-filled.png') });
 
   await page.click('[data-dz-clear]');
@@ -199,6 +212,26 @@ try {
   check('Remove clears the file and restores the idle state',
     (await page.locator('[data-dz-idle]').isVisible()) &&
     (await page.evaluate(() => document.querySelector('#pdf-input').files.length === 0)));
+  check('...and locks recipients again', (await recipientsLocked()) && (await currentStep()) === 'Upload document');
+
+  // Reminders must fit inside the expiry: the form greys out intervals as long
+  // as the time allowed to sign, and drops a choice that no longer fits.
+  const reminderState = () => page.evaluate(() => {
+    const sel = document.getElementById('reminder_days');
+    return { value: sel.value, disabled: [...sel.options].filter((o) => o.disabled).map((o) => o.value).join(',') };
+  });
+  check('reminders default to every 3 days on a 30-day document', (await reminderState()).value === '3');
+  await page.fill('#expires_in_days', '1');
+  let rs = await reminderState();
+  check('a 1-day expiry leaves only Off', rs.value === '0' && rs.disabled === '1,2,3,7', JSON.stringify(rs));
+  await page.fill('#expires_in_days', '3');
+  await page.selectOption('#reminder_days', '2');
+  rs = await reminderState();
+  check('a 3-day expiry allows every day or every 2 days', rs.value === '2' && rs.disabled === '3,7', JSON.stringify(rs));
+  await page.fill('#expires_in_days', '2');
+  rs = await reminderState();
+  check('shortening the expiry drops a choice that no longer fits', rs.value === '1', JSON.stringify(rs));
+  await page.fill('#expires_in_days', '30');
 
   // --- upload --------------------------------------------------------------
   await page.setInputFiles('input[type=file]', {

@@ -43,6 +43,10 @@ export function migrate(db, nowIso) {
   // removes it. deleted_at set means "in the trash".
   addColumn('documents', 'deleted_at', 'TEXT');
   addColumn('documents', 'deleted_by', 'TEXT');
+  // Automatic reminders: every N days while unsigned (0 = off), and when the
+  // last round went out so the next is counted from there.
+  addColumn('documents', 'reminder_days', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn('documents', 'last_reminded_at', 'TEXT');
   // A company's own logo, for its certificates, emails and sidebar. Pixel size
   // is kept so layouts can be computed without decoding the image each time.
   addColumn('companies', 'logo_path', 'TEXT');

@@ -17,6 +17,7 @@ import profileRoutes from './routes/profile.js';
 import dashboardRoutes from './routes/dashboard.js';
 import templateRoutes from './routes/templates.js';
 import platformRoutes from './routes/platform.js';
+import { startReminderSweeps } from './reminders.js';
 import { currentUser } from './middleware/auth.js';
 import { version } from './version.js';
 
@@ -134,4 +135,5 @@ app.use((err, req, res, _next) => {
 
 app.listen(config.port, () => {
   console.log(`${config.brand.name} listening on ${config.baseUrl}`);
+  startReminderSweeps();
 });

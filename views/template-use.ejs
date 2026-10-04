@@ -2,6 +2,12 @@
 <%- include('partials/shell-start') %>
 
   <div class="wrap" style="max-width:720px">
+    <%- include('partials/steps', { steps: [
+      { label: 'Choose template', state: 'done' },
+      { label: 'Add recipients', state: 'current' },
+      { label: 'Place fields', state: 'todo' },
+      { label: 'Send', state: 'todo' },
+    ] }) %>
     <div class="page-head">
       <div>
         <h1><%= template.title %></h1>
@@ -50,10 +56,21 @@
           <label for="message">Message to recipients <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
           <textarea id="message" name="message"><%= values.message %></textarea>
         </div>
-        <div class="field" style="max-width:200px;margin-bottom:0">
-          <label for="expires_in_days">Expires in (days)</label>
-          <input id="expires_in_days" name="expires_in_days" type="number" value="<%= values.expires %>" min="1" max="365">
+        <div class="grid-2">
+          <div class="field" style="margin-bottom:0">
+            <label for="expires_in_days">Expires in (days)</label>
+            <input id="expires_in_days" name="expires_in_days" type="number" value="<%= values.expires %>" min="1" max="365">
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label for="reminder_days">Automatic reminders</label>
+          <select id="reminder_days" name="reminder_days">
+            <% reminderChoices.forEach(function (c) { %>
+              <option value="<%= c[0] %>" <%= c[0] === values.reminders ? 'selected' : '' %>><%= c[1] %></option>
+            <% }); %>
+          </select>
+          </div>
         </div>
+        <p class="hint">Anyone who has not signed is sent their link again on this schedule until they sign or the document expires.</p>
       </div>
 
       <div class="btn-row" style="margin-top:18px">
@@ -68,5 +85,7 @@
       <p class="hint">Either way a new document is created — the template itself is never changed.</p>
     </form>
   </div>
+
+<script src="/static/js/expiry-reminders.js?v=<%= v %>" defer></script>
 
 <%- include('partials/shell-end') %>

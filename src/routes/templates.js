@@ -10,6 +10,7 @@ import { requireAuth, ownedDocument, usableTemplate, canManageTemplate } from '.
 import { sha256Buffer, uuid } from '../crypto.js';
 import { cloneDocument } from '../clone.js';
 import { sendDocument } from './documents.js';
+import { readReminderDays, fitReminderDays, REMINDER_CHOICES, DEFAULT_REMINDER_DAYS } from '../reminders.js';
 
 const router = Router();
 
@@ -212,7 +213,8 @@ router.get('/templates/:id/use', requireAuth, usableTemplate, (req, res) => {
     template: t,
     roles: rolesOf(t.id),
     fieldCount: db.prepare('SELECT COUNT(*) AS n FROM fields WHERE document_id = ?').get(t.id).n,
-    values: { title: t.title, message: t.message || '', expires: 30, people: {} },
+    values: { title: t.title, message: t.message || '', expires: 30, reminders: DEFAULT_REMINDER_DAYS, people: {} },
+    reminderChoices: REMINDER_CHOICES,
     error: null,
   });
 });
@@ -229,13 +231,15 @@ router.post('/templates/:id/use', requireAuth, usableTemplate, async (req, res, 
       title: String(req.body.title || '').trim().slice(0, 200) || t.title,
       message: String(req.body.message || '').trim().slice(0, 2000),
       expires: Math.min(Math.max(Number(req.body.expires_in_days) || 30, 1), 365),
+      reminders: 0, // fitted to the expiry just below
       people: Object.fromEntries(roles.map((r, i) => [r.id, people[i]])),
     };
+    values.reminders = fitReminderDays(readReminderDays(req.body.reminder_days), values.expires);
 
     const missing = roles.find((r, i) => !people[i].name || !EMAIL.test(people[i].email));
     if (missing) {
       return res.status(400).render('template-use', {
-        template: t, roles, values,
+        template: t, roles, values, reminderChoices: REMINDER_CHOICES,
         fieldCount: db.prepare('SELECT COUNT(*) AS n FROM fields WHERE document_id = ?').get(t.id).n,
         error: `Enter a name and a valid email for “${missing.name}”.`,
       });
@@ -251,6 +255,7 @@ router.post('/templates/:id/use', requireAuth, usableTemplate, async (req, res, 
       templateId: t.id,
       people,
     });
+    db.prepare('UPDATE documents SET reminder_days = ? WHERE id = ?').run(values.reminders, id);
     const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(id);
     audit({
       documentId: id,
