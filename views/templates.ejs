@@ -1,0 +1,76 @@
+<%- include('partials/head', { title: 'Templates' }) %>
+<%- include('partials/shell-start') %>
+<%
+  const TABS = [['', 'All', counts.all], ['team', 'Team', counts.team], ['private', 'Private', counts.private]];
+%>
+  <div class="wrap wrap-wide">
+    <div class="page-head">
+      <div>
+        <h1>Templates</h1>
+        <p class="sub">Forms you send again and again — set the fields up once, then just fill in who signs.</p>
+      </div>
+      <div class="spacer"></div>
+      <a class="btn" href="/templates/new">New template</a>
+    </div>
+
+    <% if (counts.all) { %>
+      <div class="doc-tools">
+        <nav class="tabs-line" aria-label="Filter templates">
+          <% TABS.forEach(function (t) { %>
+            <a href="/templates<%= t[0] ? '?show=' + t[0] : '' %>" class="<%= (show || '') === t[0] ? 'active' : '' %>"
+               <%= (show || '') === t[0] ? 'aria-current=page' : '' %>><%= t[1] %> <span class="tab-count"><%= t[2] %></span></a>
+          <% }); %>
+        </nav>
+      </div>
+    <% } %>
+
+    <% if (!counts.all) { %>
+      <div class="card">
+        <div class="empty">
+          <p style="font-size:16px;margin:0 0 6px;color:var(--text-2)">No templates yet.</p>
+          <p style="margin:0 auto 20px;max-width:520px">
+            Upload a form you use often, name the roles who sign it — “Parent”, “Learner”, “Employee” — and place
+            the fields once. You can also open any document you have already prepared and choose
+            <b>Save as template</b>.
+          </p>
+          <a class="btn" href="/templates/new">Create your first template</a>
+        </div>
+      </div>
+    <% } else if (!templates.length) { %>
+      <div class="card"><div class="empty">No <%= show %> templates.</div></div>
+    <% } else { %>
+      <div class="tpl-grid">
+        <% templates.forEach(function (t) { %>
+          <article class="tpl card">
+            <div class="tpl-top">
+              <span class="tpl-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg>
+              </span>
+              <span class="vis vis-<%= t.template_visibility %>"><%= t.template_visibility === 'team' ? 'Team' : 'Private' %></span>
+            </div>
+            <h2 class="tpl-title"><%= t.title %></h2>
+            <p class="tpl-roles"><b>Signed by:</b> <%= t.roles || '—' %></p>
+            <p class="tpl-meta">
+              <%= t.field_count %> field<%= t.field_count === 1 ? '' : 's' %> ·
+              <%= t.page_count %> page<%= t.page_count === 1 ? '' : 's' %> ·
+              used <%= t.uses %> time<%= t.uses === 1 ? '' : 's' %>
+              <% if (!t.mine) { %><br>by <%= t.owner_name %><% } %>
+            </p>
+            <% if (!t.field_count) { %>
+              <p class="tpl-warn">No fields placed yet<%= t.canManage ? ' — edit the fields before using it.' : '.' %></p>
+            <% } %>
+            <div class="tpl-actions">
+              <a class="btn btn-sm" href="/templates/<%= t.id %>/use">Use template</a>
+              <% if (t.canManage) { %>
+                <a class="btn btn-ghost btn-sm" href="/documents/<%= t.id %>/prepare">Edit fields</a>
+                <a class="btn btn-ghost btn-sm" href="/templates/<%= t.id %>/edit">Details</a>
+              <% } %>
+            </div>
+          </article>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+
+<%- include('partials/shell-end') %>

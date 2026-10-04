@@ -15,7 +15,7 @@ router.get('/team', requireAdmin, (req, res) => {
   const users = db
     .prepare(
       `SELECT u.*,
-              (SELECT COUNT(*) FROM documents d WHERE d.owner_id = u.id) AS document_count
+              (SELECT COUNT(*) FROM documents d WHERE d.owner_id = u.id AND d.status != 'template') AS document_count
        FROM users u
        ORDER BY u.role = 'admin' DESC, u.status = 'active' DESC, u.display_name COLLATE NOCASE`
     )

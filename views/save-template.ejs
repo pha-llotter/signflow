@@ -1,0 +1,54 @@
+<%- include('partials/head', { title: 'Save as template' }) %>
+<%- include('partials/shell-start') %>
+
+  <div class="wrap" style="max-width:720px">
+    <div class="page-head">
+      <div>
+        <h1>Save as template</h1>
+        <p class="sub">Copies the PDF and every field on “<%= doc.title %>” into a reusable template. Nothing anyone typed or signed is copied.</p>
+      </div>
+    </div>
+
+    <form method="post" action="/documents/<%= doc.id %>/save-template">
+      <div class="card">
+        <div class="field">
+          <label for="title">Template name</label>
+          <input id="title" name="title" type="text" value="<%= values.title %>" required>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Name the roles</h2>
+        <p class="hint">Each person on this document becomes a role. Name it for what they are, so it reads right for whoever fills it next time.</p>
+        <div style="margin-top:14px">
+          <% recipients.forEach(function (r, i) { %>
+            <div class="field">
+              <label for="role_<%= r.id %>">Role <%= i + 1 %> <span style="font-weight:400;color:var(--text-3)">— was <%= r.name %></span></label>
+              <input id="role_<%= r.id %>" name="role_<%= r.id %>" type="text" value="Signer <%= i + 1 %>" placeholder="e.g. Parent">
+            </div>
+          <% }); %>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Who can use it</h2>
+        <div class="choice-cards" style="margin-top:12px">
+          <label class="choice">
+            <input type="radio" name="visibility" value="private" checked>
+            <span><strong>Private</strong><small>Only you can see and use it.</small></span>
+          </label>
+          <label class="choice">
+            <input type="radio" name="visibility" value="team">
+            <span><strong>Team</strong><small>Everyone on the team can use it. Only you and administrators can change it.</small></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button class="btn" type="submit">Save template</button>
+        <a class="btn btn-ghost" href="/documents/<%= doc.id %>">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+<%- include('partials/shell-end') %>

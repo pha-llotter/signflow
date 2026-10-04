@@ -57,7 +57,9 @@ router.get('/verify', (req, res) => res.redirect(301, '/'));
  * — re-pointing it would break verification for every document already issued.
  */
 router.get('/verify/:id', (req, res) => {
-  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+  // Templates are never signed, so they are never something to verify — and a
+  // private one must not be discoverable here by its id.
+  const doc = db.prepare(`SELECT * FROM documents WHERE id = ? AND status != 'template'`).get(req.params.id);
   if (!doc) {
     return res.status(404).render('verify', {
       result: null, lookup: { found: false, id: req.params.id }, query: req.params.id, formatStamp,
@@ -76,7 +78,7 @@ router.get('/verify/:id', (req, res) => {
 router.post(['/', '/verify'], (req, res) => {
   const q = String(req.body.query || '').trim();
   const doc = db
-    .prepare('SELECT * FROM documents WHERE id = ? OR sealed_sha256 = ? OR signed_sha256 = ? OR original_sha256 = ?')
+    .prepare(`SELECT * FROM documents WHERE status != 'template' AND (id = ? OR sealed_sha256 = ? OR signed_sha256 = ? OR original_sha256 = ?)`)
     .get(q, q.toLowerCase(), q.toLowerCase(), q.toLowerCase());
   if (!doc) {
     return res.status(404).render('verify', { result: null, lookup: { found: false, id: q }, query: q, formatStamp });
@@ -97,7 +99,7 @@ router.post(['/check', '/verify/upload'], receivePdf, (req, res) => {
   }
   const sha = sha256Buffer(req.file.buffer);
   const doc = db
-    .prepare('SELECT * FROM documents WHERE sealed_sha256 = ? OR signed_sha256 = ? OR original_sha256 = ?')
+    .prepare(`SELECT * FROM documents WHERE status != 'template' AND (sealed_sha256 = ? OR signed_sha256 = ? OR original_sha256 = ?)`)
     .get(sha, sha, sha);
 
   if (!doc) {

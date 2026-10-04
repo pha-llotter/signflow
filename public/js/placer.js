@@ -479,8 +479,9 @@ function renderInspector() {
       rows.push(`<label class="check" style="margin-bottom:8px"><input type="checkbox" data-bind="meta.certified" ${f.meta.certified !== false ? 'checked' : ''}>
         <span>Certify the signature — prints the signer's name, email, the time they signed and the
         document reference around the mark</span></label>`);
-      rows.push(`<p class="hint" style="margin:-2px 0 12px">Turn this off for a bare signature. Keep the field
-        roughly this size or the details will not fit and it falls back to the mark alone.</p>`);
+      rows.push(`<p class="hint" style="margin:-2px 0 12px">Turn this off for a bare signature. A tall field
+        stacks the details under the mark; a short one sets them beside it. Only a field too small to print
+        them legibly falls back to the mark alone.</p>`);
       break;
     case 'label':
       rows.push(textRow('Text on the page', 'meta.text', f.meta.text || ''));
@@ -659,7 +660,7 @@ document.getElementById('save-btn').addEventListener('click', save);
 document.getElementById('send-form').addEventListener('submit', async (e) => {
   if (!state.fields.length) {
     e.preventDefault();
-    alert('Place at least one field before sending.');
+    alert(e.target.dataset.emptyMessage || 'Place at least one field before sending.');
     return;
   }
   if (state.dirty) {

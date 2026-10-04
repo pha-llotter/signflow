@@ -1,0 +1,72 @@
+<%- include('partials/head', { title: 'Use ' + template.title }) %>
+<%- include('partials/shell-start') %>
+
+  <div class="wrap" style="max-width:720px">
+    <div class="page-head">
+      <div>
+        <h1><%= template.title %></h1>
+        <p class="sub">
+          From a template · <%= template.page_count %> page<%= template.page_count === 1 ? '' : 's' %> ·
+          <%= fieldCount %> field<%= fieldCount === 1 ? '' : 's' %> already placed
+        </p>
+      </div>
+    </div>
+
+    <% if (error) { %><div class="notice notice-bad" style="margin-top:0;margin-bottom:18px"><%= error %></div><% } %>
+    <% if (!fieldCount) { %>
+      <div class="notice notice-warn" style="margin-top:0;margin-bottom:18px">
+        This template has no fields yet, so you will need to place them before it can be sent.
+      </div>
+    <% } %>
+
+    <form method="post" action="/templates/<%= template.id %>/use">
+      <div class="card">
+        <h2>Who signs</h2>
+        <p class="hint">
+          Fill in a person for each role.<% if (template.signing_order) { %> They are invited in this order.<% } %>
+        </p>
+        <div style="margin-top:14px">
+          <% roles.forEach(function (r, i) { const p = values.people[r.id] || {}; %>
+            <div class="use-role">
+              <div class="use-role-label"><span class="step"><%= i + 1 %></span><%= r.name %></div>
+              <div class="grid-2">
+                <div><label for="name_<%= r.id %>">Name</label>
+                  <input id="name_<%= r.id %>" type="text" name="name_<%= r.id %>" value="<%= p.name || '' %>" placeholder="Full name" required></div>
+                <div><label for="email_<%= r.id %>">Email</label>
+                  <input id="email_<%= r.id %>" type="email" name="email_<%= r.id %>" value="<%= p.email || '' %>" placeholder="name@example.com" required></div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>The document</h2>
+        <div class="field" style="margin-top:12px">
+          <label for="title">Title</label>
+          <input id="title" name="title" type="text" value="<%= values.title %>">
+        </div>
+        <div class="field">
+          <label for="message">Message to recipients <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
+          <textarea id="message" name="message"><%= values.message %></textarea>
+        </div>
+        <div class="field" style="max-width:200px;margin-bottom:0">
+          <label for="expires_in_days">Expires in (days)</label>
+          <input id="expires_in_days" name="expires_in_days" type="number" value="<%= values.expires %>" min="1" max="365">
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:18px">
+        <% if (fieldCount) { %>
+          <button class="btn" type="submit" name="action" value="send">Send now</button>
+        <% } %>
+        <button class="btn <%= fieldCount ? 'btn-ghost' : '' %>" type="submit" name="action" value="review">
+          <%= fieldCount ? 'Review fields first' : 'Continue to fields →' %>
+        </button>
+        <a class="btn btn-ghost" href="/templates">Cancel</a>
+      </div>
+      <p class="hint">Either way a new document is created — the template itself is never changed.</p>
+    </form>
+  </div>
+
+<%- include('partials/shell-end') %>

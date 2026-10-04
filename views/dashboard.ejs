@@ -1,0 +1,132 @@
+<%- include('partials/head', { title: 'Dashboard' }) %>
+<%- include('partials/shell-start') %>
+<%
+  const svg = (d, size = 18) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const ICONS = {
+    sign: '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"></path>',
+    declined: '<circle cx="12" cy="12" r="8.5"></circle><path d="m9 9 6 6M15 9l-6 6"></path>',
+    stale: '<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path>',
+    me: '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"></path>',
+    others: '<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path>',
+    completed: '<circle cx="12" cy="12" r="8.5"></circle><path d="m8.5 12.2 2.4 2.4 4.6-4.8"></path>',
+  };
+%>
+
+  <div class="wrap wrap-wide dash">
+
+    <% if (!mailReady) { %>
+      <div class="banner">
+        <span class="banner-icon"><%- svg('<path d="M4 6.5h16v11H4z"></path><path d="m4.5 7 7.5 6 7.5-6"></path>') %></span>
+        <div class="banner-body">
+          <strong>Outgoing mail isn't set up yet</strong>
+          <p>Signing links are written to the server console instead of being emailed.
+            <% if (!isAdmin) { %>Ask an administrator to set it up — you can still copy links by hand.<% } %></p>
+        </div>
+        <% if (isAdmin) { %><a class="btn btn-sm" href="/settings">Set up mail</a><% } %>
+      </div>
+    <% } %>
+
+    <div class="dash-head">
+      <div>
+        <h1 class="hello">Hello <%= firstName %>,</h1>
+        <p class="sub">
+          <% if (!needs.length) { %>Nothing needs you right now.<%
+             } else { %><%= needs.length %> thing<%= needs.length === 1 ? '' : 's' %> need<%= needs.length === 1 ? 's' : '' %> your attention.<% } %>
+        </p>
+      </div>
+      <div class="btn-row dash-actions">
+        <a class="btn btn-ghost btn-lg" href="/templates">Use a template</a>
+        <a class="btn btn-lg" href="/documents/new">Send a document</a>
+      </div>
+    </div>
+
+    <section class="needs card" aria-labelledby="needs-h">
+      <h2 class="eyebrow" id="needs-h">Needs you</h2>
+      <% if (!needs.length) { %>
+        <div class="all-clear">
+          <%- svg('<path d="m5 12.5 4.5 4.5L19 7.5"></path>', 22) %>
+          <strong>All clear</strong>
+          <p>Nothing is waiting on you, and nothing has been sitting unsigned for more than <%= staleDays %> days.</p>
+        </div>
+      <% } else { %>
+        <ul class="needs-list">
+          <% needs.forEach(function (n) { %>
+            <li class="need need-<%= n.kind %>">
+              <span class="need-icon"><%- svg(ICONS[n.kind]) %></span>
+              <a class="need-text" href="<%= n.href %>">
+                <strong><%= n.title %></strong>
+                <span><%= n.detail %></span>
+              </a>
+              <% if (n.kind === 'stale') { %>
+                <form method="post" action="/documents/<%= n.id %>/remind" class="inline">
+                  <button class="btn btn-ghost btn-sm" type="submit">Send a reminder</button>
+                </form>
+              <% } else { %>
+                <a class="btn btn-sm <%= n.kind === 'sign' ? '' : 'btn-ghost' %>" href="<%= n.href %>"><%= n.cta %></a>
+              <% } %>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </section>
+
+    <section class="stats" aria-label="At a glance">
+      <div class="stat card">
+        <div class="stat-label">Median time to sign</div>
+        <div class="stat-value"><%= stats.medianToSign || '—' %></div>
+        <div class="stat-note">
+          <% if (stats.completedCount) { %>across <%= stats.completedCount %> completed document<%= stats.completedCount === 1 ? '' : 's' %>
+          <% } else { %>shown once a document is completed<% } %>
+        </div>
+      </div>
+      <div class="stat card">
+        <div class="stat-label">Completion rate</div>
+        <div class="stat-value"><%= stats.completionRate === null ? '—' : stats.completionRate + '%' %></div>
+        <div class="stat-note"><%= stats.completedCount %> of <%= stats.closed %> sent</div>
+      </div>
+      <div class="stat card">
+        <div class="stat-label">Sent this month</div>
+        <div class="stat-value"><%= stats.sentThisMonth %></div>
+        <div class="stat-note"><%= new Date().toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' }) %></div>
+      </div>
+      <div class="stat card">
+        <div class="stat-label">Awaiting signature</div>
+        <div class="stat-value"><%= stats.awaiting %></div>
+        <div class="stat-note"><%= stats.signatures %> signature<%= stats.signatures === 1 ? '' : 's' %> collected in total</div>
+      </div>
+    </section>
+
+    <section class="board" aria-label="Documents by status">
+      <% columns.forEach(function (c) { %>
+        <div class="col col-<%= c.key %>">
+          <div class="col-head">
+            <span><%= c.title %></span>
+            <span class="col-count"><%= c.total %></span>
+          </div>
+          <% if (!c.items.length) { %>
+            <div class="col-empty">
+              <%- svg(ICONS[c.key], 40) %>
+              <p><%= c.empty %></p>
+            </div>
+          <% } else { %>
+            <ul class="col-list">
+              <% c.items.forEach(function (it) { %>
+                <li><a href="<%= it.href %>"><strong><%= it.title %></strong><span><%= it.sub %></span></a></li>
+              <% }); %>
+            </ul>
+          <% } %>
+          <% if (c.href && c.total) { %>
+            <a class="col-foot" href="<%= c.href %>">View all<%= c.total > c.items.length ? ' ' + c.total : '' %> →</a>
+          <% } %>
+        </div>
+      <% }); %>
+    </section>
+
+    <section class="totals" aria-label="Totals">
+      <a class="total" href="/documents?status=draft"><b><%= totals.drafts %></b><span>Drafts</span></a>
+      <a class="total" href="/documents"><b><%= totals.all %></b><span>Documents in total</span></a>
+      <a class="total" href="/documents?status=completed"><b><%= totals.completed %></b><span>Completed</span></a>
+    </section>
+  </div>
+
+<%- include('partials/shell-end') %>

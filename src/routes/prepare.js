@@ -1,13 +1,16 @@
 import { Router } from 'express';
 import { db } from '../db.js';
-import { requireAuth, ownedDocument } from '../middleware/auth.js';
+import { requireAuth, editableDocument } from '../middleware/auth.js';
 import { uuid } from '../crypto.js';
 import { FIELD_TYPES, FIELD_GROUPS, STAMP_PRESETS, isValidType } from '../fields.js';
 
 const router = Router();
 
-router.get('/documents/:id/prepare', requireAuth, ownedDocument, (req, res) => {
-  if (req.doc.status !== 'draft') return res.redirect(`/documents/${req.doc.id}`);
+// A template's layout stays editable for ever; a document's only until it is sent.
+const EDITABLE = ['draft', 'template'];
+
+router.get('/documents/:id/prepare', requireAuth, editableDocument, (req, res) => {
+  if (!EDITABLE.includes(req.doc.status)) return res.redirect(`/documents/${req.doc.id}`);
   const recipients = db
     .prepare('SELECT * FROM recipients WHERE document_id = ? ORDER BY order_index')
     .all(req.doc.id);
@@ -29,8 +32,8 @@ router.get('/documents/:id/prepare', requireAuth, ownedDocument, (req, res) => {
  * owns the canonical layout client-side; a partial save would let a dropped
  * request leave orphaned fields behind.
  */
-router.put('/api/documents/:id/fields', requireAuth, ownedDocument, (req, res) => {
-  if (req.doc.status !== 'draft') {
+router.put('/api/documents/:id/fields', requireAuth, editableDocument, (req, res) => {
+  if (!EDITABLE.includes(req.doc.status)) {
     return res.status(409).json({ error: 'This document has been sent and can no longer be edited.' });
   }
 

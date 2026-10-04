@@ -332,7 +332,7 @@ async function run() {
     display_name: 'A Colleague', password: 'another-long-password', password_confirm: 'another-long-password',
   }));
   check('the colleague accepts the invitation',
-    res.status === 302 && res.headers.get('location') === '/documents',
+    res.status === 302 && res.headers.get('location') === '/dashboard',
     `got ${res.status} → ${res.headers.get('location')}`);
 
   res = await req('GET', `/documents/${docId}`);

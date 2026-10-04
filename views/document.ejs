@@ -25,6 +25,7 @@
         <% } else if (doc.status === 'completed') { %>
           <a class="btn" href="/documents/<%= doc.id %>/signed.pdf">Download sealed PDF</a>
         <% } %>
+        <a class="btn btn-ghost" href="/documents/<%= doc.id %>/save-template">Save as template</a>
       </div>
     </div>
 

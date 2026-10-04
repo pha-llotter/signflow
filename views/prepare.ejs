@@ -1,11 +1,12 @@
-<%- include('partials/head', { title: 'Prepare · ' + doc.title, bodyClass: 'no-scroll' }) %>
+<% const isTemplate = doc.status === 'template'; %>
+<%- include('partials/head', { title: (isTemplate ? 'Template · ' : 'Prepare · ') + doc.title, bodyClass: 'no-scroll' }) %>
 
 <div class="placer" id="placer">
   <div class="placer-bar">
-    <a class="brand brand-compact" href="/documents" title="Back to documents">
+    <a class="brand brand-compact" href="<%= isTemplate ? '/templates' : '/documents' %>" title="<%= isTemplate ? 'Back to templates' : 'Back to documents' %>">
       <img src="/static/brand/logo-mark.png?v=<%= v %>" alt="<%= brand.name %>" width="24" height="24">
     </a>
-    <h1><%= doc.title %></h1>
+    <h1><% if (isTemplate) { %><span class="vis vis-<%= doc.template_visibility %>">Template</span> <% } %><%= doc.title %></h1>
     <span class="hint" id="save-state">All changes saved</span>
     <div class="spacer"></div>
     <button type="button" class="btn btn-sm placer-toggle" id="toggle-palette">+ Add field</button>
@@ -20,14 +21,21 @@
       <input type="checkbox" id="grid-toggle" checked>
       <span style="font-size:13px">Snap to grid</span>
     </label>
-    <button class="btn btn-ghost btn-sm" id="save-btn" type="button">Save draft</button>
-    <form method="post" action="/documents/<%= doc.id %>/send" class="inline" id="send-form">
-      <button class="btn btn-sm" type="submit" id="send-btn">Send for signature</button>
-    </form>
+    <button class="btn btn-ghost btn-sm" id="save-btn" type="button"><%= isTemplate ? 'Save' : 'Save draft' %></button>
+    <% if (isTemplate) { %>
+      <%# Same id as the send form so the placer flushes unsaved fields before leaving. %>
+      <form method="get" action="/templates" class="inline" id="send-form" data-empty-message="Place at least one field before saving the template.">
+        <button class="btn btn-sm" type="submit" id="send-btn">Done</button>
+      </form>
+    <% } else { %>
+      <form method="post" action="/documents/<%= doc.id %>/send" class="inline" id="send-form">
+        <button class="btn btn-sm" type="submit" id="send-btn">Send for signature</button>
+      </form>
+    <% } %>
   </div>
 
   <aside class="palette">
-    <h3>Placing fields for</h3>
+    <h3><%= isTemplate ? 'Placing fields for the role' : 'Placing fields for' %></h3>
     <ul class="recip-list" id="recip-list">
       <% recipients.forEach(function (r, i) { %>
         <li data-id="<%= r.id %>" class="<%= i === 0 ? 'active' : '' %>">

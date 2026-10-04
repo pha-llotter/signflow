@@ -365,7 +365,7 @@ token.
 
 ## Responsive layout
 
-`npm run responsive-audit` walks all nine pages at phone (390), tablet (768) and
+`npm run responsive-audit` walks all ten pages at phone (390), tablet (768) and
 desktop (1440) widths and fails on horizontal overflow, controls that trigger the
 iOS focus-zoom, and tap targets under 40px. It writes a screenshot of every
 page/width combination so regressions are visible rather than inferred.

@@ -48,13 +48,50 @@ export function requireAdmin(req, res, next) {
   next();
 }
 
-/** Loads a document and refuses it unless the signed-in user owns it. */
+/**
+ * Loads a document and refuses it unless the signed-in user owns it. Templates
+ * are stored as documents but are never reachable through the document routes
+ * — they have their own, with their own sharing rules.
+ */
 export function ownedDocument(req, res, next) {
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
-  if (!doc || doc.owner_id !== req.user.id) {
+  if (!doc || doc.owner_id !== req.user.id || doc.status === 'template') {
     return res.status(404).render('error', { code: 404, message: 'Document not found.' });
   }
   req.doc = doc;
+  next();
+}
+
+/** A private template is its creator's alone; a team template is everyone's to use. */
+export const canUseTemplate = (user, doc) =>
+  doc?.status === 'template' && (doc.owner_id === user.id || doc.template_visibility === 'team');
+
+/** Editing is narrower than using: the creator, or an administrator for a team template. */
+export const canManageTemplate = (user, doc) =>
+  doc?.status === 'template' &&
+  (doc.owner_id === user.id || (doc.template_visibility === 'team' && user.role === 'admin'));
+
+/**
+ * For the routes the placer shares between drafts and templates: a draft must
+ * be the user's own, a template must be one they may manage. 404 otherwise,
+ * so a private template's id does not confirm it exists.
+ */
+export function editableDocument(req, res, next) {
+  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+  const ok = doc && (doc.status === 'template' ? canManageTemplate(req.user, doc) : doc.owner_id === req.user.id);
+  if (!ok) return res.status(404).render('error', { code: 404, message: 'Document not found.' });
+  req.doc = doc;
+  next();
+}
+
+/** Loads a template the user may at least use. */
+export function usableTemplate(req, res, next) {
+  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+  if (!canUseTemplate(req.user, doc)) {
+    return res.status(404).render('error', { code: 404, message: 'Template not found.' });
+  }
+  req.doc = doc;
+  req.canManage = canManageTemplate(req.user, doc);
   next();
 }
 

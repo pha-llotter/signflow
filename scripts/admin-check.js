@@ -59,7 +59,9 @@ const form = (obj) => {
  * but before the next row, so a naive split silently returns the neighbouring
  * row's ids and the test then asserts against the wrong account.
  */
-const rowFor = (html, email) => html.split('<tr').find((r) => r.includes(email)) || '';
+// slice(1): the page head before the first row also carries the signed-in
+// user's email (the account menu), and must not be mistaken for their row.
+const rowFor = (html, email) => html.split('<tr').slice(1).find((r) => r.includes(email)) || '';
 
 const server = spawn(process.execPath, ['src/server.js'], {
   cwd: path.resolve(import.meta.dirname, '..'),
@@ -137,7 +139,7 @@ try {
     display_name: 'A Member', password: 'member-long-password', password_confirm: 'member-long-password',
   }));
   check('accepting the invitation creates the account',
-    res.status === 302 && res.headers.get('location') === '/documents',
+    res.status === 302 && res.headers.get('location') === '/dashboard',
     `${res.status} → ${res.headers.get('location')}`);
 
   res = await member.req('GET', `/invite/${inviteToken}`);
@@ -217,7 +219,7 @@ try {
   const restored = session();
   res = await restored.req('POST', '/login', form({ email: memberEmail, password: 'member-long-password' }));
   check('restoring an account lets them sign in again',
-    res.status === 302 && res.headers.get('location') === '/documents',
+    res.status === 302 && res.headers.get('location') === '/dashboard',
     `${res.status} → ${res.headers.get('location')}`);
 
   // --- password reset ------------------------------------------------------
@@ -233,7 +235,7 @@ try {
       password: 'brand-new-password-1', password_confirm: 'brand-new-password-1',
     }));
     check('the reset link sets a new password and signs in',
-      res.status === 302 && res.headers.get('location') === '/documents',
+      res.status === 302 && res.headers.get('location') === '/dashboard',
       `${res.status} → ${res.headers.get('location')}`);
 
     res = await session().req('GET', `/reset/${resetToken}`);

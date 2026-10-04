@@ -2,12 +2,12 @@
   <header class="pub-bar">
     <%# Signed in, the logo goes to your own work; signed out, to the public
         verification page at the root. %>
-    <a class="brand" href="<%= user ? '/documents' : '/' %>">
+    <a class="brand" href="<%= user ? '/dashboard' : '/' %>">
       <img src="/static/brand/logo-web.png?v=<%= v %>" alt="<%= brand.name %>" width="98" height="22">
     </a>
     <nav>
       <% if (user) { %>
-        <a href="/documents">Documents</a>
+        <a href="/dashboard">Dashboard</a>
       <% } else { %>
         <a href="/login">Sign in</a>
       <% } %>

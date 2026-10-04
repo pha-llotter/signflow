@@ -23,6 +23,15 @@ export function migrate(db, nowIso) {
   addUserColumn('last_seen_at', 'TEXT');
   addUserColumn('invited_by', 'TEXT');
 
+  // Templates are documents with status 'template': they reuse the stored PDF,
+  // the field table and the placer. Their recipients are roles ("Parent"),
+  // with an empty email until the template is used.
+  const docCols = columns(db, 'documents');
+  if (!docCols.has('template_visibility')) db.exec(`ALTER TABLE documents ADD COLUMN template_visibility TEXT`);
+  // On a document made from a template, which one. Not a foreign key: deleting
+  // the template must leave the documents made from it untouched.
+  if (!docCols.has('template_id')) db.exec(`ALTER TABLE documents ADD COLUMN template_id TEXT`);
+
   // Ensure the settings singleton exists before anything tries to read it.
   db.prepare('INSERT OR IGNORE INTO app_settings (id, updated_at) VALUES (1, ?)').run(nowIso());
 

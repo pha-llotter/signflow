@@ -12,6 +12,10 @@ import { embedLogo } from './brand.js';
 
 const INK_NAVY = rgb(0.06, 0.10, 0.19);
 const INK_MUTED = rgb(0.42, 0.46, 0.52);
+// The smallest certification text worth printing; below it, the detail is noise.
+const MIN_CERT_PT = 4;
+// A long, short field would otherwise grow its details to headline size.
+const MAX_COMPACT_PT = 7.5;
 
 /**
  * Maps a field rectangle — stored normalised against the page as it is
@@ -281,7 +285,11 @@ async function drawSignatureBlock(pdf, page, box, { image, doc, recipient, helv,
   if (timeWidth() > timeRoom) fs *= timeRoom / timeWidth();
 
   // Below about 4pt this stops being readable in print and starts being noise.
-  if (fs < 4) return false;
+  // A short field has the width but not the height for five stacked lines, so
+  // it gets the side-by-side layout instead before giving up on the block.
+  if (fs < MIN_CERT_PT) {
+    return drawCompactSignatureBlock(page, box, { image, helv, bold, docLine, nameLine, emailLine, timeLine });
+  }
 
   const at = (dx, dy) => offsetInBox(box, dx, dy);
   const text = (str, dx, dy, { font = bold, color = INK_NAVY, size = fs } = {}) => {
@@ -360,6 +368,110 @@ async function drawSignatureBlock(pdf, page, box, { image, doc, recipient, helv,
   const dashEnd = w - markW - (markW ? fs * 0.45 : 0);
   if (dashEnd - dashStart > fs * 0.4) {
     polyline([[dashStart, 0], [dashEnd, 0]], INK_NAVY, rule);
+  }
+
+  return true;
+}
+
+/**
+ * The certification block for a field that is wide but short — a signature
+ * line drawn at the height of a line of text. The mark sits on the left and the
+ * details stack in a column beside it, so the text is sized against the full
+ * height rather than a tenth of it.
+ *
+ * The document reference, the signer and the time are what make the mark
+ * self-describing, so they always print. The email is dropped first when the
+ * column is too narrow: it is also on the certificate of completion, which
+ * the reference leads to. Returns false only when even that will not fit at a
+ * legible size, and the caller stamps the bare mark.
+ */
+function drawCompactSignatureBlock(page, box, { image, helv, bold, docLine, nameLine, emailLine, timeLine }) {
+  const { w, h } = box;
+  const LEAD = 1.2;
+
+  const contentX = Math.max(h * 0.3, 5);
+  const innerW = w - contentX - w * 0.03;
+  const gap = Math.max(h * 0.16, 3);
+  // The mark always keeps at least this share of the width, so the block never
+  // becomes a caption with a signature-shaped speck beside it.
+  const minMarkW = innerW * 0.3;
+  const textRoom = innerW - minMarkW - gap;
+  if (textRoom <= 0) return false;
+
+  const lines = [
+    { str: docLine, font: bold, color: INK_NAVY, scale: 1 },
+    { str: nameLine, font: bold, color: INK_NAVY, scale: 1 },
+    { str: emailLine, font: helv, color: INK_MUTED, scale: 0.94 },
+    { str: timeLine, font: bold, color: INK_NAVY, scale: 0.94 },
+  ];
+  const fit = (set) => {
+    // Tall enough for the stack with a little air top and bottom...
+    let size = Math.min((h * 0.9) / (1 + (set.length - 1) * LEAD), MAX_COMPACT_PT);
+    // ...and narrow enough for its longest line.
+    const widest = Math.max(...set.map((l) => l.font.widthOfTextAtSize(l.str, size * l.scale)));
+    if (widest > textRoom) size *= textRoom / widest;
+    return size;
+  };
+
+  let set = lines.filter((l) => l.str);
+  let fs = fit(set);
+  if (fs < MIN_CERT_PT) {
+    set = set.filter((l) => l.str !== emailLine);
+    fs = fit(set);
+  }
+  if (fs < MIN_CERT_PT) return false;
+
+  const at = (dx, dy) => offsetInBox(box, dx, dy);
+  const textW = Math.max(...set.map((l) => l.font.widthOfTextAtSize(l.str, fs * l.scale)));
+  // The mark gets what it needs to fill the height, within whatever the text
+  // leaves — no more, or a long field strands the details at its far end.
+  const bandH = h * 0.86;
+  const wanted = image ? (image.width * bandH) / image.height : minMarkW;
+  const markW = Math.min(Math.max(wanted, minMarkW), innerW - textW - gap);
+  const textX = contentX + markW + gap;
+
+  // --- the bracket, the same shape as the full block's ---------------------
+  const r = Math.min(h * 0.18, w * 0.05);
+  const stub = contentX * 1.4;
+  const rule = Math.max(h * 0.02, 0.6);
+  const arc = (cx, cy, from, to) =>
+    Array.from({ length: 7 }, (_, i) => {
+      const a = from + ((to - from) * i) / 6;
+      return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+    });
+  const points = [
+    [stub, h],
+    ...arc(r, h - r, Math.PI / 2, Math.PI),
+    [0, r],
+    ...arc(r, r, Math.PI, (3 * Math.PI) / 2),
+    [stub, 0],
+  ];
+  for (let i = 1; i < points.length; i++) {
+    page.drawLine({ start: at(...points[i - 1]), end: at(...points[i]), thickness: rule, color: INK_NAVY });
+  }
+
+  // --- the mark ------------------------------------------------------------
+  if (image) {
+    const scale = Math.min(markW / image.width, bandH / image.height);
+    const iw = image.width * scale;
+    const ih = image.height * scale;
+    const p = at(contentX + (markW - iw) / 2, (h - ih) / 2);
+    page.drawImage(image, { x: p.x, y: p.y, width: iw, height: ih, rotate: box.rotation });
+  }
+
+  // A hairline between the mark and the details, so they read as two halves
+  // of one stamp rather than a signature with some text that happens to be near.
+  const divX = contentX + markW + gap / 2;
+  page.drawLine({ start: at(divX, h * 0.1), end: at(divX, h * 0.9), thickness: rule * 0.6, color: INK_MUTED });
+
+  // --- the details, centred on the box's height ----------------------------
+  const lead = fs * LEAD;
+  const blockH = fs + (set.length - 1) * lead;
+  let baseline = (h + blockH) / 2 - fs * 0.8;
+  for (const l of set) {
+    const p = at(textX, baseline);
+    page.drawText(l.str, { x: p.x, y: p.y, size: fs * l.scale, font: l.font, color: l.color, rotate: box.rotation });
+    baseline -= lead;
   }
 
   return true;

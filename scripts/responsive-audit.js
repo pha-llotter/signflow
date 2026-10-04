@@ -268,7 +268,10 @@ try {
     ['login', `${BASE}/login`, anon],
     // /register is unreachable once the founding account exists; admin-check
     // is where that is asserted.
+    ['dashboard', `${BASE}/dashboard`, page],
     ['documents', `${BASE}/documents`, page],
+    ['templates', `${BASE}/templates`, page],
+    ['template-new', `${BASE}/templates/new`, page],
     ['new', `${BASE}/documents/new`, page],
     ['document', `${BASE}/documents/${docId}`, page],
     ['settings', `${BASE}/settings`, page],

@@ -1,19 +1,49 @@
 <%- include('partials/head', { title: 'Documents' }) %>
 <%- include('partials/shell-start') %>
 
-  <div class="wrap">
+<%
+  const TABS = [
+    ['', 'All', total],
+    ['draft', 'Drafts', counts.draft || 0],
+    ['sent', 'Out for signature', counts.sent || 0],
+    ['completed', 'Completed', counts.completed || 0],
+    ['declined', 'Declined', counts.declined || 0],
+  ];
+  const tabHref = (s) => '/documents' + (s || q ? '?' + new URLSearchParams(Object.assign({}, s ? { status: s } : {}, q ? { q } : {})) : '');
+  const heading = status ? TABS.find((t) => t[0] === status)[1] : 'Documents';
+%>
+  <div class="wrap wrap-wide">
     <div class="page-head">
       <div>
-        <h1>Documents</h1>
+        <h1><%= heading %></h1>
         <p class="sub">
-          <%= docs.length %> in total ·
-          <%= counts.draft || 0 %> draft ·
-          <%= counts.sent || 0 %> out for signature ·
-          <%= counts.completed || 0 %> completed
+          <% if (q) { %>
+            <%= docs.length %> result<%= docs.length === 1 ? '' : 's' %> for “<%= q %>” ·
+            <a href="<%= status ? '/documents?status=' + status : '/documents' %>">clear search</a>
+          <% } else { %>
+            <%= total %> in total ·
+            <%= counts.draft || 0 %> draft ·
+            <%= counts.sent || 0 %> out for signature ·
+            <%= counts.completed || 0 %> completed
+          <% } %>
         </p>
       </div>
       <div class="spacer"></div>
       <a class="btn" href="/documents/new">Send a document</a>
+    </div>
+
+    <div class="doc-tools">
+      <nav class="tabs-line" aria-label="Filter by status">
+        <% TABS.forEach(function (t) { %>
+          <a href="<%= tabHref(t[0]) %>" class="<%= (status || '') === t[0] ? 'active' : '' %>"
+             <%= (status || '') === t[0] ? 'aria-current=page' : '' %>><%= t[1] %> <span class="tab-count"><%= t[2] %></span></a>
+        <% }); %>
+      </nav>
+      <%# The top bar's search is hidden on narrow screens, so this one stands in. %>
+      <form class="doc-search" method="get" action="/documents" role="search">
+        <% if (status) { %><input type="hidden" name="status" value="<%= status %>"><% } %>
+        <input type="search" name="q" value="<%= q %>" placeholder="Search documents…" aria-label="Search documents">
+      </form>
     </div>
 
     <% if (!mailReady) { %>
@@ -28,7 +58,13 @@
     <% } %>
 
     <div class="card" style="padding:14px 8px">
-      <% if (!docs.length) { %>
+      <% if (!docs.length && (status || q)) { %>
+        <div class="empty">
+          <p style="font-size:16px;margin:0 0 6px;color:var(--text-2)">No documents match.</p>
+          <p style="margin:0 0 20px"><%= q ? 'Try a different search, or look in another tab.' : 'Nothing has this status yet.' %></p>
+          <a class="btn btn-ghost" href="/documents">Show all documents</a>
+        </div>
+      <% } else if (!docs.length) { %>
         <div class="empty">
           <p style="font-size:16px;margin:0 0 6px;color:var(--text-2)">Nothing here yet.</p>
           <p style="margin:0 0 20px">Upload a PDF, drop the fields where they belong, and send it.</p>

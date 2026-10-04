@@ -6,7 +6,7 @@ import { PDFDocument } from 'pdf-lib';
 
 import { config } from '../config.js';
 import { db, nowIso, audit } from '../db.js';
-import { requireAuth, ownedDocument } from '../middleware/auth.js';
+import { requireAuth, ownedDocument, canUseTemplate } from '../middleware/auth.js';
 import { sha256Buffer, uuid, token } from '../crypto.js';
 import { send, invitationEmail } from '../mailer.js';
 import { mailConfigured } from '../settings-store.js';
@@ -38,18 +38,32 @@ function receivePdf(req, res, next) {
   });
 }
 
+const DOC_STATUSES = ['draft', 'sent', 'completed', 'declined'];
+
 router.get('/documents', requireAuth, (req, res) => {
-  const docs = db
+  const all = db
     .prepare(
       `SELECT d.*,
               (SELECT COUNT(*) FROM recipients r WHERE r.document_id = d.id) AS recipient_count,
-              (SELECT COUNT(*) FROM recipients r WHERE r.document_id = d.id AND r.status = 'signed') AS signed_count
-       FROM documents d WHERE d.owner_id = ? ORDER BY d.created_at DESC`
+              (SELECT COUNT(*) FROM recipients r WHERE r.document_id = d.id AND r.status = 'signed') AS signed_count,
+              (SELECT group_concat(name || ' ' || email, ' ') FROM recipients r WHERE r.document_id = d.id) AS recipient_text
+       FROM documents d WHERE d.owner_id = ? AND d.status != 'template' ORDER BY d.created_at DESC`
     )
     .all(req.user.id);
 
-  const counts = docs.reduce((acc, d) => ({ ...acc, [d.status]: (acc[d.status] || 0) + 1 }), {});
-  res.render('documents', { docs, counts, mailReady: mailConfigured() });
+  // Counts describe everything the user owns, so the filter tabs keep their
+  // numbers while one of them is selected.
+  const counts = all.reduce((acc, d) => ({ ...acc, [d.status]: (acc[d.status] || 0) + 1 }), {});
+  const status = DOC_STATUSES.includes(req.query.status) ? req.query.status : null;
+  const q = String(req.query.q || '').trim().slice(0, 100);
+  const needle = q.toLowerCase();
+
+  const docs = all.filter(
+    (d) =>
+      (!status || d.status === status) &&
+      (!needle || [d.title, d.filename, d.recipient_text].some((s) => String(s || '').toLowerCase().includes(needle)))
+  );
+  res.render('documents', { docs, total: all.length, counts, status, q, mailReady: mailConfigured() });
 });
 
 router.get('/documents/new', requireAuth, (req, res) => {
@@ -145,46 +159,55 @@ router.get('/documents/:id', requireAuth, ownedDocument, (req, res) => {
   res.render('document', { doc: req.doc, recipients, events, baseUrl: config.baseUrl });
 });
 
-/** Sends the envelope: issues one-time tokens and mails the signing links. */
+/**
+ * Sends a draft: issues one-time tokens and mails the signing links. Shared by
+ * the placer's Send button and by "Send now" on a template. Returns the flash
+ * to show and where to go next.
+ */
+export async function sendDocument({ doc, user, req }) {
+  if (doc.status !== 'draft') {
+    return { flash: { type: 'error', text: 'This document has already been sent.' }, to: `/documents/${doc.id}` };
+  }
+
+  const recipients = db
+    .prepare('SELECT * FROM recipients WHERE document_id = ? ORDER BY order_index')
+    .all(doc.id);
+  const fieldCount = db
+    .prepare('SELECT COUNT(*) AS n FROM fields WHERE document_id = ?')
+    .get(doc.id).n;
+
+  if (!recipients.length || fieldCount === 0) {
+    return { flash: { type: 'error', text: 'Place at least one field before sending.' }, to: `/documents/${doc.id}/prepare` };
+  }
+
+  const setToken = db.prepare('UPDATE recipients SET token = ? WHERE id = ?');
+  for (const r of recipients) setToken.run(token(), r.id);
+
+  db.prepare(`UPDATE documents SET status = 'sent', sent_at = ? WHERE id = ?`).run(nowIso(), doc.id);
+  audit({ documentId: doc.id, actor: user.email, action: 'Document sent', req });
+
+  // With signing order on, only the first recipient is invited now; the rest
+  // are invited as the one before them signs.
+  const toInvite = doc.signing_order ? recipients.slice(0, 1) : recipients;
+  const problems = [];
+  for (const r of toInvite) {
+    const result = await inviteRecipient({ doc, recipient: r, sender: user, req });
+    if (!result.delivered) problems.push(`${r.email}: ${result.reason}`);
+  }
+
+  return {
+    flash: problems.length
+      ? { type: 'error', text: `Sent, but mail did not go out — ${problems.join('; ')}. Copy the signing links below instead.` }
+      : { type: 'ok', text: `Invitation sent to ${toInvite.map((r) => r.email).join(', ')}.` },
+    to: `/documents/${doc.id}`,
+  };
+}
+
 router.post('/documents/:id/send', requireAuth, ownedDocument, async (req, res, next) => {
   try {
-    const doc = req.doc;
-    if (doc.status !== 'draft') {
-      req.session.flash = { type: 'error', text: 'This document has already been sent.' };
-      return res.redirect(`/documents/${doc.id}`);
-    }
-
-    const recipients = db
-      .prepare('SELECT * FROM recipients WHERE document_id = ? ORDER BY order_index')
-      .all(doc.id);
-    const fieldCount = db
-      .prepare('SELECT COUNT(*) AS n FROM fields WHERE document_id = ?')
-      .get(doc.id).n;
-
-    if (!recipients.length || fieldCount === 0) {
-      req.session.flash = { type: 'error', text: 'Place at least one field before sending.' };
-      return res.redirect(`/documents/${doc.id}/prepare`);
-    }
-
-    const setToken = db.prepare('UPDATE recipients SET token = ? WHERE id = ?');
-    for (const r of recipients) setToken.run(token(), r.id);
-
-    db.prepare(`UPDATE documents SET status = 'sent', sent_at = ? WHERE id = ?`).run(nowIso(), doc.id);
-    audit({ documentId: doc.id, actor: req.user.email, action: 'Document sent', req });
-
-    // With signing order on, only the first recipient is invited now; the rest
-    // are invited as the one before them signs.
-    const toInvite = doc.signing_order ? recipients.slice(0, 1) : recipients;
-    const problems = [];
-    for (const r of toInvite) {
-      const result = await inviteRecipient({ doc, recipient: r, sender: req.user, req });
-      if (!result.delivered) problems.push(`${r.email}: ${result.reason}`);
-    }
-
-    req.session.flash = problems.length
-      ? { type: 'error', text: `Sent, but mail did not go out — ${problems.join('; ')}. Copy the signing links below instead.` }
-      : { type: 'ok', text: `Invitation sent to ${toInvite.map((r) => r.email).join(', ')}.` };
-    res.redirect(`/documents/${doc.id}`);
+    const { flash, to } = await sendDocument({ doc: req.doc, user: req.user, req });
+    req.session.flash = flash;
+    res.redirect(to);
   } catch (err) {
     next(err);
   }
@@ -214,6 +237,9 @@ export async function inviteRecipient({ doc, recipient, sender, req = null }) {
 }
 
 router.post('/documents/:id/remind', requireAuth, ownedDocument, async (req, res) => {
+  // A draft has not been sent, so there is nothing to remind anyone about —
+  // and inviting from here would send it without going through Send.
+  if (req.doc.status !== 'sent') return res.redirect(`/documents/${req.doc.id}`);
   const pending = db
     .prepare(`SELECT * FROM recipients WHERE document_id = ? AND status IN ('pending','viewed') ORDER BY order_index`)
     .all(req.doc.id);
@@ -223,7 +249,19 @@ router.post('/documents/:id/remind', requireAuth, ownedDocument, async (req, res
   res.redirect(`/documents/${req.doc.id}`);
 });
 
-router.get('/documents/:id/original.pdf', requireAuth, ownedDocument, (req, res) => {
+/**
+ * The placer and the template pages load the PDF from here, so besides the
+ * owner of a document it also serves a template to anyone who may use it.
+ */
+function readableOriginal(req, res, next) {
+  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+  const ok = doc && (doc.status === 'template' ? canUseTemplate(req.user, doc) : doc.owner_id === req.user.id);
+  if (!ok) return res.status(404).render('error', { code: 404, message: 'Document not found.' });
+  req.doc = doc;
+  next();
+}
+
+router.get('/documents/:id/original.pdf', requireAuth, readableOriginal, (req, res) => {
   res.type('application/pdf').sendFile(path.resolve(req.doc.original_path));
 });
 

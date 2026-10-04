@@ -1,0 +1,113 @@
+<%- include('partials/head', { title: mode === 'new' ? 'New template' : 'Template details' }) %>
+<%- include('partials/shell-start') %>
+
+  <div class="wrap" style="max-width:720px">
+    <div class="page-head">
+      <div>
+        <h1><%= mode === 'new' ? 'New template' : 'Template details' %></h1>
+        <p class="sub">
+          <% if (mode === 'new') { %>
+            Upload the form and name who signs it. You place the fields on the next screen — once.
+          <% } else { %>
+            <%= template.filename %> · <%= template.page_count %> page<%= template.page_count === 1 ? '' : 's' %>
+          <% } %>
+        </p>
+      </div>
+    </div>
+
+    <% if (error) { %><div class="notice notice-bad" style="margin-top:0;margin-bottom:18px"><%= error %></div><% } %>
+
+    <form method="post" action="<%= mode === 'new' ? '/templates/new' : '/templates/' + template.id + '/edit' %>"
+          <%- mode === 'new' ? 'enctype="multipart/form-data"' : '' %>>
+      <div class="card">
+        <h2>The form</h2>
+        <% if (mode === 'new') { %>
+          <div class="field" style="margin-top:14px">
+            <%- include('partials/dropzone', {
+                  id: 'pdf-input', name: 'pdf', accept: 'application/pdf,.pdf', maxMb: maxUploadMb,
+                  title: 'Drag your PDF here', sub: `PDF only, up to ${maxUploadMb} MB`
+                }) %>
+          </div>
+        <% } %>
+        <div class="field" style="margin-top:14px">
+          <label for="title">Template name</label>
+          <input id="title" name="title" type="text" value="<%= values.title %>"
+                 placeholder="<%= mode === 'new' ? 'Leave blank to use the file name' : '' %>" <%= mode === 'edit' ? 'required' : '' %>>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label for="message">Default message <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
+          <textarea id="message" name="message" placeholder="Pre-filled into the invitation each time — you can still change it."><%= values.message %></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Who signs</h2>
+        <p class="hint">Name the <b>roles</b>, not the people. Each time the template is used you fill in who plays each role.</p>
+        <div id="roles" style="margin-top:14px">
+          <% values.roles.forEach(function (r) { %>
+            <div class="role-row">
+              <input type="hidden" name="role_id" value="<%= r.id %>">
+              <input type="text" name="role_name" value="<%= r.name %>" placeholder="e.g. Parent" aria-label="Role" required>
+              <button type="button" class="btn btn-ghost btn-sm remove-role">Remove</button>
+            </div>
+          <% }); %>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" id="add-role">+ Add a role</button>
+        <% if (mode === 'edit') { %>
+          <p class="hint">Removing a role also removes the fields placed for it.</p>
+        <% } %>
+        <label class="check" style="margin-top:16px">
+          <input type="checkbox" name="signing_order" value="1" <%= values.signingOrder ? 'checked' : '' %>>
+          <span>Sign in order — each role is only invited once the one before has signed.</span>
+        </label>
+      </div>
+
+      <div class="card">
+        <h2>Who can use it</h2>
+        <div class="choice-cards" style="margin-top:12px">
+          <label class="choice">
+            <input type="radio" name="visibility" value="private" <%= values.visibility !== 'team' ? 'checked' : '' %>>
+            <span><strong>Private</strong><small>Only you can see and use it.</small></span>
+          </label>
+          <label class="choice">
+            <input type="radio" name="visibility" value="team" <%= values.visibility === 'team' ? 'checked' : '' %>>
+            <span><strong>Team</strong><small>Everyone on the team can use it. Only you and administrators can change it.</small></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button class="btn" type="submit"><%= mode === 'new' ? 'Continue to fields →' : 'Save changes' %></button>
+        <a class="btn btn-ghost" href="/templates">Cancel</a>
+      </div>
+    </form>
+
+    <% if (mode === 'edit') { %>
+      <div class="card" style="margin-top:28px">
+        <h2>Delete template</h2>
+        <p class="hint">Documents already sent from it are not affected.</p>
+        <form method="post" action="/templates/<%= template.id %>/delete" style="margin-top:12px"
+              onsubmit="return confirm('Delete this template? Documents already sent from it are kept.')">
+          <button class="btn btn-danger btn-sm" type="submit">Delete template</button>
+        </form>
+      </div>
+    <% } %>
+  </div>
+
+<% if (mode === 'new') { %><script src="/static/js/dropzone.js?v=<%= v %>" defer></script><% } %>
+<script>
+  // Roles are a repeatable row; the server reads them as parallel arrays.
+  const list = document.getElementById('roles');
+  document.getElementById('add-role').addEventListener('click', () => {
+    const row = list.firstElementChild.cloneNode(true);
+    row.querySelectorAll('input').forEach((i) => { i.value = ''; });
+    list.appendChild(row);
+    row.querySelector('input[type=text]').focus();
+  });
+  list.addEventListener('click', (e) => {
+    if (!e.target.matches('.remove-role')) return;
+    if (list.children.length > 1) e.target.closest('.role-row').remove();
+  });
+</script>
+
+<%- include('partials/shell-end') %>

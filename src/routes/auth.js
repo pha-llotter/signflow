@@ -24,7 +24,7 @@ const firstRunOnly = (req, res, next) => {
 };
 
 router.get('/register', firstRunOnly, (req, res) => {
-  if (req.user) return res.redirect('/documents');
+  if (req.user) return res.redirect('/dashboard');
   res.render('register', { values: {}, error: null });
 });
 
@@ -65,7 +65,7 @@ router.post('/register', firstRunOnly, async (req, res) => {
 });
 
 router.get('/login', (req, res) => {
-  if (req.user) return res.redirect('/documents');
+  if (req.user) return res.redirect('/dashboard');
   res.render('login', {
     email: '',
     error: req.query.deactivated
@@ -99,7 +99,7 @@ router.post('/login', async (req, res) => {
   req.session.regenerate((err) => {
     if (err) return reject('Could not start a session.');
     req.session.userId = user.id;
-    const to = req.session.returnTo || '/documents';
+    const to = req.session.returnTo || '/dashboard';
     delete req.session.returnTo;
     res.redirect(to);
   });
@@ -166,7 +166,7 @@ router.post('/invite/:token', loadInvite, async (req, res) => {
 
   req.session.regenerate(() => {
     req.session.userId = id;
-    res.redirect('/documents');
+    res.redirect('/dashboard');
   });
 });
 
@@ -220,7 +220,7 @@ router.post('/reset/:token', loadReset, async (req, res) => {
   req.session.regenerate(() => {
     req.session.userId = req.resetUser.id;
     req.session.flash = { type: 'ok', text: 'Your new password is set.' };
-    res.redirect('/documents');
+    res.redirect('/dashboard');
   });
 });
 
