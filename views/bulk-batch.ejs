@@ -1,0 +1,74 @@
+<%- include('partials/head', { title: 'Bulk send' }) %>
+<% if (batch.status === 'running') { %><meta http-equiv="refresh" content="3"><% } %>
+<%- include('partials/shell-start') %>
+<%
+  const done = batch.sent + batch.undelivered + batch.failed;
+  const pct = batch.total ? Math.round((done / batch.total) * 100) : 100;
+%>
+  <div class="wrap" style="max-width:860px">
+    <%- include('partials/steps', { steps: [
+      { label: 'Choose template', state: 'done' },
+      { label: 'Upload recipients', state: 'done' },
+      { label: 'Review', state: 'done' },
+      { label: 'Send', state: batch.status === 'running' ? 'current' : 'done' },
+    ] }) %>
+    <div class="page-head">
+      <div>
+        <h1><%= batch.status === 'running' ? 'Sending…' : 'Bulk send' %></h1>
+        <p class="sub"><%= batch.template_title %> · started <%= new Date(batch.created_at).toLocaleString() %></p>
+      </div>
+      <div class="spacer"></div>
+      <% if (batch.template_id) { %>
+        <a class="btn btn-ghost" href="/templates/<%= batch.template_id %>/bulk">Send another file</a>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <div class="bulk-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<%= pct %>">
+        <span style="width:<%= pct %>%"></span>
+      </div>
+      <p class="bulk-summary" id="bulk-summary">
+        <b><%= done %></b> of <b><%= batch.total %></b> processed
+        · <span class="bulk-ok-text"><%= batch.sent %> sent</span>
+        <% if (batch.undelivered) { %>· <span class="bulk-warn-text"><%= batch.undelivered %> created but email not delivered</span><% } %>
+        <% if (batch.failed) { %>· <span class="bulk-bad-text"><%= batch.failed %> failed</span><% } %>
+      </p>
+      <% if (batch.status === 'running') { %>
+        <p class="hint" style="margin-bottom:0">This page updates itself. You can leave — sending carries on.</p>
+      <% } else if (batch.status === 'interrupted') { %>
+        <div class="notice notice-warn">
+          The server restarted before this finished, so <%= batch.total - done %> row<%= batch.total - done === 1 ? ' was' : 's were' %>
+          not sent. Upload a file with just those people to send them.
+        </div>
+      <% } else if (batch.undelivered) { %>
+        <div class="notice notice-warn">
+          Documents whose email did not go out are still waiting to be signed — open them to copy the signing link
+          or send a reminder once mail is working.
+        </div>
+      <% } %>
+    </div>
+
+    <% if (docs.length) { %>
+      <div class="card">
+        <h2>Documents</h2>
+        <table>
+          <thead><tr><th>Document</th><th>Recipients</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <% docs.forEach(function (d) { %>
+              <tr>
+                <td class="td-primary"><a href="/documents/<%= d.id %>" style="font-weight:600;color:var(--text)"><%= d.title %></a></td>
+                <td data-label="Recipients" class="hint"><%= d.people %></td>
+                <td data-label="Status">
+                  <% if (d.deleted_at) { %><span class="pill pill-draft">in trash</span>
+                  <% } else { %><span class="pill pill-<%= d.status %>"><%= d.status %></span><% } %>
+                </td>
+                <td class="td-action"><a class="btn btn-ghost btn-sm" href="/documents/<%= d.id %>">Track</a></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+<%- include('partials/shell-end') %>

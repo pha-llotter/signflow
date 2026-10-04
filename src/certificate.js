@@ -231,7 +231,7 @@ export async function buildCertificate(pdf, { doc, owner, recipients, events }) 
     // The build is recorded here deliberately. If a defect is ever found in the
     // sealing or hashing, this is what says whether a given document was
     // produced by the affected code.
-    const footer = `Certificate page ${i + 1} of ${pages.length}  ·  Document ${doc.id}  ·  Stored in ${config.dataRegion}  ·  ${config.brand.name} ${version.stamp}`;
+    const footer = `Certificate page ${i + 1} of ${pages.length}  ·  Document ${doc.id}  ·  Stored in ${config.dataRegionShort}  ·  ${config.brand.name} ${version.stamp}`;
     p.drawLine({
       start: { x: MARGIN, y: MARGIN - 6 }, end: { x: A4[0] - MARGIN, y: MARGIN - 6 },
       thickness: 0.5, color: RULE,

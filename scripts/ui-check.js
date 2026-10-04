@@ -253,7 +253,7 @@ try {
   // Pages are appended one at a time as each finishes rendering, so waiting for
   // the first canvas and then counting is a race — wait for the whole set.
   await page.waitForFunction(
-    () => document.querySelectorAll('.pdf-page canvas').length >= 2,
+    () => document.querySelectorAll('.pdf-page.painted').length >= 2,
     null,
     { timeout: 20000 }
   );
@@ -321,6 +321,54 @@ try {
     Math.abs(after.x - before.x) > 40 && Math.abs(after.y - before.y) > 20,
     `moved ${Math.round(after.x - before.x)}, ${Math.round(after.y - before.y)} px`);
 
+  // Alignment guides: bring the date's left edge within a few pixels of the
+  // signature's, and it snaps into line with a guide drawn while dragging.
+  // Deselect first: a selected field is raised above its neighbours, and the
+  // signature moved above now overlaps the date.
+  await page.click('#field-done');
+  await page.locator('.fld[data-type="date_signed"]').scrollIntoViewIfNeeded();
+  const sigBox = await page.locator('.fld[data-type="signature"]').boundingBox();
+  const dateBox = await page.locator('.fld[data-type="date_signed"]').boundingBox();
+  const gx = dateBox.x + dateBox.width / 2, gy = dateBox.y + dateBox.height / 2;
+  await page.mouse.move(gx, gy);
+  await page.mouse.down();
+  await page.mouse.move(gx + (sigBox.x - dateBox.x) + 3, gy + 7, { steps: 8 });
+  const guides = await page.locator('.align-guide.align-v').count();
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  const lined = await page.locator('.fld[data-type="date_signed"]').boundingBox();
+  check('dragging near another field\'s edge shows an alignment guide', guides === 1, `guides ${guides}`);
+  check('...and snaps the edges into line', Math.abs(lined.x - sigBox.x) < 1, `${lined.x} vs ${sigBox.x}`);
+  check('the guide goes away once the field is dropped', (await page.locator('.align-guide').count()) === 0);
+
+  // The right column: the selected field's settings, or the pages when nothing is.
+  await page.click('#field-done');
+  await page.waitForTimeout(150);
+  const thumbCount = await page.locator('#thumbs .thumb').count();
+  check('with nothing selected, the right column shows a thumbnail of every page',
+    (await page.locator('#pages-panel').isVisible()) && thumbCount === (await page.locator('.pdf-page').count()), `thumbs ${thumbCount}`);
+  check('...marking where the fields are', (await page.locator('#thumbs .thumb-mark').count()) === (await page.locator('.fld').count()));
+  await page.locator('#thumbs .thumb').nth(1).click();
+  await page.waitForTimeout(700);
+  check('clicking a thumbnail goes to that page', await page.locator('#thumbs .thumb').nth(1).evaluate((n) => n.classList.contains('current')));
+
+  // Zoom: in, then Fit back.
+  const fitWidth = (await page.locator('.pdf-page').first().boundingBox()).width;
+  const fitLabel = await page.locator('#zoom-label').innerText();
+  await page.click('#zoom-in');
+  await page.waitForTimeout(300);
+  const zoomedWidth = (await page.locator('.pdf-page').first().boundingBox()).width;
+  check('zoom in enlarges the page and updates the percentage',
+    zoomedWidth > fitWidth * 1.05 && (await page.locator('#zoom-label').innerText()) !== fitLabel, `${fitWidth} → ${zoomedWidth}`);
+  check('...and fields stay where they were on the page', await page.evaluate(() => {
+    const f = document.querySelector('.fld'), p = f.closest('.pdf-page');
+    return Math.abs(f.offsetLeft / p.offsetWidth - parseFloat(f.style.left) / 100) < 0.01;
+  }));
+  await page.click('#zoom-fit');
+  await page.waitForTimeout(300);
+  check('Fit returns the page to the window', Math.abs((await page.locator('.pdf-page').first().boundingBox()).width - fitWidth) < 2
+    && (await page.locator('#zoom-fit.on').count()) === 1);
+
   await page.click('#save-btn');
   await page.waitForFunction(() => document.getElementById('save-state').textContent === 'All changes saved', null, { timeout: 8000 });
   check('fields autosaved to the server', true);
@@ -331,6 +379,7 @@ try {
   // nothing about the overlay is skipped the way a person would not skip it.
   await page.setViewportSize({ width: 1000, height: 800 });
   await page.waitForTimeout(400);
+  await page.evaluate(() => document.getElementById('canvas-area').scrollTo(0, 0));
   await page.click('#toggle-palette');
   await page.waitForTimeout(300);
   const fieldsBefore = await page.locator('.fld').count();
@@ -375,7 +424,24 @@ try {
   const fillable = await signPage.locator('.sfld.mine').count();
   check('signer sees their own fields as fillable', fillable >= 1, `found ${fillable}`);
 
-  check('Finish is disabled before consent', await signPage.locator('#finish-btn').isDisabled());
+  // Consent comes first, in a welcome popup that covers the document.
+  check('a welcome popup greets the signer, with the terms and consent',
+    (await signPage.locator('#welcome').isVisible()) && /Before you sign/.test(await signPage.locator('#welcome').innerText()));
+  check('Continue waits for consent', await signPage.locator('#welcome-continue').isDisabled());
+  await signPage.screenshot({ path: path.join(OUT, '2b-welcome.png') });
+  await signPage.check('#consent');
+  await signPage.click('#welcome-continue');
+  await signPage.waitForTimeout(300);
+  check('after consenting, the document has the whole page', (await signPage.locator('#welcome').count()) === 0
+    && !(await signPage.locator('.sign-side').count()));
+  check('Finish is disabled until the required fields are done', await signPage.locator('#finish-btn').isDisabled());
+  await signPage.waitForSelector('#sign-thumbs .thumb-mark.todo', { timeout: 5000 }).catch(() => {});
+  check('the signer sees the pages beside the document, with their fields still to do marked',
+    (await signPage.locator('#sign-thumbs .thumb').count()) === (await signPage.locator('.pdf-page').count())
+    && (await signPage.locator('#sign-thumbs .thumb-mark.todo').count()) >= 1);
+  await signPage.click('#next-btn');
+  await signPage.waitForTimeout(200);
+  check('Next field takes the signer to the field to fill', (await signPage.locator('.sfld.mine.pulse').count()) === 1);
 
   // Draw a signature.
   await signPage.locator('.sfld.mine').first().click();
@@ -416,15 +482,18 @@ try {
   const applied = await signPage.locator('.sfld.mine.done img').count();
   check('the drawn signature was applied to the field', applied >= 1, `found ${applied}`);
 
-  await signPage.check('#consent');
-  await signPage.waitForTimeout(200);
   const canFinish = !(await signPage.locator('#finish-btn').isDisabled());
-  check('Finish enables once consent and required fields are done', canFinish);
+  check('Finish enables once the required fields are done', canFinish);
 
   await signPage.screenshot({ path: path.join(OUT, '4-signing.png'), fullPage: false });
 
   if (canFinish) {
     await signPage.click('#finish-btn');
+    await signPage.waitForSelector('.modal', { timeout: 5000 });
+    check('Finish asks for confirmation before anything is signed',
+      /cannot be changed/.test(await signPage.locator('.modal').innerText()) && !signPage.url().endsWith('/done'));
+    await signPage.screenshot({ path: path.join(OUT, '4b-confirm.png') });
+    await signPage.click('.modal #m-ok');
     await signPage.waitForURL('**/done', { timeout: 20000 });
     check('signing completed and sealed', true);
     await signPage.screenshot({ path: path.join(OUT, '5-done.png'), fullPage: true });

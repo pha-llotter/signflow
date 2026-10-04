@@ -17,10 +17,17 @@
       <div class="doc-tools">
         <nav class="tabs-line" aria-label="Filter templates">
           <% TABS.forEach(function (t) { %>
-            <a href="/templates<%= t[0] ? '?show=' + t[0] : '' %>" class="<%= (show || '') === t[0] ? 'active' : '' %>"
+            <a href="/templates<%= t[0] ? '?show=' + t[0] + (bulk ? '&for=bulk' : '') : (bulk ? '?for=bulk' : '') %>" class="<%= (show || '') === t[0] ? 'active' : '' %>"
                <%= (show || '') === t[0] ? 'aria-current=page' : '' %>><%= t[1] %> <span class="tab-count"><%= t[2] %></span></a>
           <% }); %>
         </nav>
+      </div>
+    <% } %>
+
+    <% if (bulk && counts.all) { %>
+      <div class="notice notice-info" style="margin-top:0;margin-bottom:18px">
+        Choose the template to bulk send. You will download a blank CSV for it, fill in one row per
+        person, and upload it — each row becomes its own document.
       </div>
     <% } %>
 
@@ -61,7 +68,13 @@
               <p class="tpl-warn">No fields placed yet<%= t.canManage ? ' — edit the fields before using it.' : '.' %></p>
             <% } %>
             <div class="tpl-actions">
-              <a class="btn btn-sm" href="/templates/<%= t.id %>/use">Use template</a>
+              <% if (bulk) { %>
+                <a class="btn btn-sm" href="/templates/<%= t.id %>/bulk">Bulk send</a>
+                <a class="btn btn-ghost btn-sm" href="/templates/<%= t.id %>/use">Use once</a>
+              <% } else { %>
+                <a class="btn btn-sm" href="/templates/<%= t.id %>/use">Use template</a>
+                <a class="btn btn-ghost btn-sm" href="/templates/<%= t.id %>/bulk">Bulk send</a>
+              <% } %>
               <% if (t.canManage) { %>
                 <a class="btn btn-ghost btn-sm" href="/documents/<%= t.id %>/prepare">Edit fields</a>
                 <a class="btn btn-ghost btn-sm" href="/templates/<%= t.id %>/edit">Details</a>

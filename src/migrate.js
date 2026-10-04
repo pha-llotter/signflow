@@ -47,6 +47,8 @@ export function migrate(db, nowIso) {
   // last round went out so the next is counted from there.
   addColumn('documents', 'reminder_days', 'INTEGER NOT NULL DEFAULT 0');
   addColumn('documents', 'last_reminded_at', 'TEXT');
+  // A document made by a bulk send points back at its batch.
+  addColumn('documents', 'bulk_batch_id', 'TEXT');
   // A company's own logo, for its certificates, emails and sidebar. Pixel size
   // is kept so layouts can be computed without decoding the image each time.
   addColumn('companies', 'logo_path', 'TEXT');

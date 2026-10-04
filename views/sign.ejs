@@ -8,63 +8,64 @@
 </header>
 <script src="/static/js/theme.js?v=<%= v %>" defer></script>
 
-<div class="sign-layout">
-  <div class="sign-doc">
-    <div id="pages"></div>
+<%#
+  The document takes the full width. What used to be a side panel is now:
+  a welcome popup (who is asking, the message, what signing records, consent),
+  this action bar (progress, next field, finish), and a confirmation popup.
+  On a phone the bar moves to the bottom of the screen, within thumb reach.
+%>
+<div class="sign-bar" id="sign-bar">
+  <div class="sign-bar-inner">
+    <span class="sign-progress">
+      <strong id="done-count">0</strong> of <%= myFields.length %> field<%= myFields.length === 1 ? '' : 's' %> done
+    </span>
+    <button type="button" class="link-btn sign-decline" id="decline-btn">Decline</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="next-btn">Next field</button>
+    <button type="button" class="btn btn-sm" id="finish-btn" disabled>Finish</button>
   </div>
+  <div id="sign-error" class="notice notice-bad sign-error" hidden></div>
+</div>
 
-  <aside class="sign-side" id="sign-side">
-    <!-- Collapsed peek on phones; the whole panel on anything wider. -->
-    <button type="button" class="sheet-handle" id="sheet-toggle" aria-expanded="false" aria-controls="sign-side">
-      <span class="sheet-grip" aria-hidden="true"></span>
-      <span class="sheet-label"><strong id="sheet-progress">0 of <%= myFields.length %></strong> fields done</span>
-      <span class="sheet-cta">Review &amp; sign</span>
-    </button>
+<div class="sign-doc">
+  <div id="pages"></div>
+  <aside class="sign-pages" aria-label="Pages">
+    <h3>Pages</h3>
+    <div class="thumbs" id="sign-thumbs"></div>
+    <p class="sign-pages-key"><span class="key todo"></span>To do <span class="key done"></span>Done</p>
+  </aside>
+</div>
 
-    <h2 style="margin:0 0 4px;font-size:17px">Review &amp; sign</h2>
-    <p class="hint" style="margin-top:0">
-      <strong><%= owner.display_name %></strong>
-      <% if (owner.org_name) { %> (<%= owner.org_name %>)<% } %>
-      has asked you to sign this.
+<%# Shown on arrival, before anything can be filled in: consent comes first. %>
+<div class="modal-back" id="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-h">
+  <div class="modal welcome">
+    <h2 id="welcome-h">Review &amp; sign</h2>
+    <p class="sub">
+      <strong><%= owner.display_name %></strong><% if (owner.org_name) { %> (<%= owner.org_name %>)<% } %>
+      has asked you to sign <strong><%= doc.title %></strong>.
     </p>
     <% if (doc.message) { %>
-      <div class="notice" style="background:var(--surface-2);border-color:var(--border);color:var(--text-2)"><%= doc.message %></div>
+      <div class="welcome-message"><%= doc.message %></div>
     <% } %>
 
-    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);margin:22px 0 8px">
-      Your fields (<span id="done-count">0</span> of <%= myFields.length %>)
-    </h3>
-    <ul class="todo-list" id="todo-list">
-      <% myFields.forEach(function (f) { %>
-        <li data-id="<%= f.id %>">
-          <span class="tick">✓</span>
-          <span><%= fieldTypes[f.type].label %> <span class="hint">· page <%= f.page + 1 %></span></span>
-        </li>
-      <% }); %>
-    </ul>
-
-    <div class="notice" style="background:var(--surface-2);border-color:var(--border);color:var(--text-2);font-size:12.5px;line-height:1.5">
-      <strong style="display:block;margin-bottom:5px;color:var(--text)">Before you sign</strong>
+    <div class="welcome-terms">
+      <strong>Before you sign</strong>
       Signing this records your name, email address, IP address, browser and the time of every step, and seals
       that record to the document with a SHA-256 hash. It is kept as evidence that you signed, and stored in
       <%= dataRegion %>. This is processed under the Electronic Communications and Transactions Act and POPIA.
       Your location is never taken.
     </div>
 
-    <label class="check" style="margin:16px 0">
+    <label class="check welcome-consent">
       <input type="checkbox" id="consent">
       <span>I agree to sign this document electronically, and to the record described above being kept.</span>
     </label>
 
-    <div id="sign-error" class="notice notice-bad" style="display:none"></div>
-
-    <button class="btn" id="finish-btn" style="width:100%" disabled>Finish signing</button>
-    <button class="btn btn-ghost btn-sm" id="decline-btn" style="width:100%;margin-top:9px">Decline to sign</button>
-
-    <p class="hint" style="margin-top:14px;font-size:11.5px">
-      This link is unique to you. Do not forward it — anyone holding it can sign in your name.
-    </p>
-  </aside>
+    <div class="btn-row welcome-actions">
+      <button type="button" class="link-btn" id="welcome-decline">Decline to sign</button>
+      <button type="button" class="btn" id="welcome-continue" disabled>Continue</button>
+    </div>
+    <p class="hint welcome-fine">This link is unique to you. Do not forward it — anyone holding it can sign in your name.</p>
+  </div>
 </div>
 
 <form method="post" action="/sign/<%= token %>/decline" id="decline-form" hidden>
@@ -74,6 +75,7 @@
 <script>
   window.__SIGN__ = {
     token: <%- JSON.stringify(token) %>,
+    title: <%- JSON.stringify(doc.title) %>,
     pdfUrl: <%- JSON.stringify('/sign/' + token + '/document.pdf') %>,
     recipientId: <%- JSON.stringify(recipient.id) %>,
     recipientName: <%- JSON.stringify(recipient.name) %>,

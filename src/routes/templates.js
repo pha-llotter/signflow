@@ -82,7 +82,10 @@ router.get('/templates', requireAuth, (req, res) => {
     team: all.filter((t) => t.template_visibility === 'team').length,
     private: all.filter((t) => t.template_visibility === 'private').length,
   };
-  res.render('templates', { templates, counts, show });
+  // Arriving from "Bulk send" in the Create new menu: the same list, with
+  // bulk sending as each card's main action.
+  const bulk = req.query.for === 'bulk';
+  res.render('templates', { templates, counts, show, bulk });
 });
 
 /* ----------------------------------------------------------------- create */

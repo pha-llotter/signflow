@@ -502,6 +502,7 @@ input[type=file] { font-size: 13px; color: var(--text-3); }
 .flash-ok, .notice-ok { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok); }
 .flash-error, .notice-bad { background: var(--bad-bg); border-color: var(--bad-line); color: var(--bad); }
 .notice-warn { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn); }
+.notice-info { background: var(--brand-soft); border-color: var(--border); color: var(--text-2); }
 .flash a, .notice a { color: inherit; text-decoration: underline; font-weight: 600; }
 
 /* --------------------------------------------------------------- tables ---- */
@@ -629,7 +630,7 @@ tbody tr:hover td { background: var(--surface-2); }
 
 /* ====================================================== the field placer === */
 
-.placer { display: grid; grid-template-columns: 236px 1fr 272px; grid-template-rows: auto auto 1fr; flex: 1; min-height: 0; }
+.placer { display: grid; grid-template-columns: 252px 1fr 252px; grid-template-rows: auto auto 1fr; flex: 1; min-height: 0; }
 .placer > .steps { grid-column: 1 / -1; }
 body.no-scroll { display: flex; flex-direction: column; }
 
@@ -648,20 +649,84 @@ body.no-scroll { display: flex; flex-direction: column; }
   color: var(--text-3); margin: 20px 0 9px; font-weight: 650;
 }
 .palette h3:first-child { margin-top: 0; }
-.palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-
-.chip {
-  border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface);
-  padding: 10px 7px; font-size: 11.5px; text-align: center; cursor: grab;
-  color: var(--text-2); user-select: none; line-height: 1.25; font-weight: 500;
-  transition: border-color .12s, color .12s, background .12s;
+/* Who the next field belongs to: a picker with their colour under it. */
+.recip-pick { margin-bottom: 16px; }
+.recip-pick select { font-weight: 600; font-size: 13.5px; padding: 9px 10px; }
+.recip-bar {
+  display: block; height: 4px; margin-top: 8px; border-radius: 99px;
+  background: var(--active-recip, var(--brand)); transition: background .15s;
 }
-.chip:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+
+.palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* Field tiles: an icon over a name. The hover takes the active recipient's
+   colour — the colour the field will have once it lands. */
+.chip {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  min-height: 70px; padding: 10px 6px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+  font-size: 12.5px; font-weight: 650; text-align: center; line-height: 1.2;
+  color: var(--text); cursor: grab; user-select: none;
+  transition: border-color .12s, color .12s, background .12s, box-shadow .12s;
+}
+.chip svg { color: var(--text-2); transition: color .12s; }
+.chip:hover {
+  border-color: var(--active-recip, var(--brand)); color: var(--active-recip, var(--brand));
+  background: color-mix(in srgb, var(--active-recip, var(--brand)) 7%, var(--surface));
+}
+.chip:hover svg { color: inherit; }
+/* Fields fixed by the author belong to no one, so they keep the neutral colour. */
+.chip.chip-static:hover { border-color: var(--text-3); color: var(--text); background: var(--surface-2); }
 .chip:active { cursor: grabbing; }
 .chip.armed {
-  border-color: var(--brand); background: var(--brand); color: var(--brand-fg);
-  box-shadow: 0 0 0 3px var(--brand-ring);
+  border-color: var(--active-recip, var(--brand)); background: var(--active-recip, var(--brand)); color: #fff;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--active-recip, var(--brand)) 25%, transparent);
 }
+.chip.armed svg { color: #fff; }
+.palette-hint { margin: 16px 2px 0; font-size: 12.5px; line-height: 1.5; }
+
+/* The right column: pages until a field is selected, then that field. */
+.panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.panel-head h3 { margin: 0; }
+.pages-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.pages-panel h3 { display: flex; align-items: center; gap: 8px; }
+
+/* Page thumbnails, shared with the signing page. */
+.thumbs { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; padding: 2px 4px 12px; flex: 1; min-height: 0; }
+.thumb {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  border: 0; background: none; padding: 0; cursor: pointer; font: inherit; color: var(--text-3);
+}
+.thumb-paper {
+  position: relative; display: block; width: 100%; max-width: 160px;
+  background: #fff; border-radius: 4px; overflow: hidden;
+  box-shadow: 0 0 0 1px var(--border), var(--sh-sm);
+  transition: box-shadow .12s;
+}
+.thumb-paper canvas { display: block; width: 100%; height: auto; min-height: 60px; }
+.thumb:hover .thumb-paper { box-shadow: 0 0 0 1px var(--border-strong), var(--sh-lg); }
+.thumb.current .thumb-paper { box-shadow: 0 0 0 2px var(--brand), var(--sh-sm); }
+.thumb-num {
+  font-size: 11.5px; font-weight: 650; min-width: 22px; padding: 1px 7px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface); font-variant-numeric: tabular-nums;
+}
+.thumb.current .thumb-num { background: var(--brand); border-color: var(--brand); color: var(--brand-fg); }
+.thumb-marks { position: absolute; inset: 0; pointer-events: none; }
+.thumb-mark {
+  position: absolute; min-width: 3px; min-height: 3px; border-radius: 1px;
+  background: color-mix(in srgb, var(--mark, var(--brand)) 55%, transparent);
+  border: 1.5px solid var(--mark, var(--brand));
+}
+/* On the signing page: what is still to do stands out, what is done is quiet. */
+.thumb-mark.todo { --mark: #e8a317; }
+.thumb-mark.done { --mark: #1f9d61; }
+.thumb-mark.theirs { --mark: #9aa3b2; opacity: .6; }
+
+/* Alignment guides while dragging: magenta, the convention in design tools,
+   and a colour no recipient is given. */
+.align-guide { position: absolute; z-index: 4; pointer-events: none; background: #e0249a; }
+.align-guide.align-v { top: 0; bottom: 0; width: 1px; margin-left: -.5px; }
+.align-guide.align-h { left: 0; right: 0; height: 1px; margin-top: -.5px; }
 
 .canvas-area {
   overflow: auto; padding: 24px; background: var(--surface-3);
@@ -726,23 +791,20 @@ body.no-scroll { display: flex; flex-direction: column; }
 .inspector label { font-size: 12px; }
 .inspector input, .inspector select, .inspector textarea { font-size: 13px; padding: 8px 10px; }
 
-.recip-list { list-style: none; margin: 0 0 4px; padding: 0; }
-.recip-list li {
-  display: flex; align-items: center; gap: 9px; padding: 8px 9px;
-  border-radius: var(--r-sm); cursor: pointer; font-size: 13px;
+/* Zoom: one pill — out, the size, in, and Fit. */
+.zoombar {
+  display: inline-flex; align-items: stretch; height: 34px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden;
 }
-.recip-list li:hover { background: var(--surface-2); }
-.recip-list li.active { background: var(--brand-soft); font-weight: 640; color: var(--brand); }
-.swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
-
-.zoombar { display: flex; align-items: center; gap: 7px; }
-.zoombar button {
-  width: 30px; height: 30px; border: 1px solid var(--border-strong);
-  background: var(--surface); color: var(--text); border-radius: var(--r-sm);
-  cursor: pointer; font-size: 15px; line-height: 1;
+.zoombar button, .zoombar span {
+  display: grid; place-items: center; min-width: 38px; padding: 0 10px;
+  border: 0; background: none; color: var(--text); font: inherit; font-size: 15px; font-weight: 650;
 }
-.zoombar button:hover { border-color: var(--brand); color: var(--brand); }
-.zoombar span { font-size: 12px; color: var(--text-3); min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+.zoombar button { cursor: pointer; }
+.zoombar button:hover { background: var(--surface-2); color: var(--brand); }
+.zoombar span { min-width: 62px; font-size: 13px; border-inline: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.zoombar .zoom-fit { font-size: 13px; border-left: 1px solid var(--border); }
+.zoombar .zoom-fit.on { color: var(--brand); background: var(--brand-soft); }
 
 .placer-toggle { display: none; }
 
@@ -775,10 +837,67 @@ body.no-scroll { display: flex; flex-direction: column; }
 
 /* ======================================================== the signing page == */
 
-.sign-layout { display: grid; grid-template-columns: 1fr 352px; gap: 0; flex: 1 0 auto; min-height: 0; }
-.sign-doc { overflow: auto; padding: 24px; background: var(--surface-3); }
-.sign-side { background: var(--surface); border-left: 1px solid var(--border); padding: 24px; overflow-y: auto; }
-.sheet-handle { display: none; }
+/* The document takes the full width; the signer's controls are one slim bar
+   that stays in reach, and everything else is a popup when it is needed. */
+.sign-doc { padding: 24px 24px 48px; background: var(--surface-3); flex: 1 0 auto; }
+.sign-doc #pages { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+/* The pages pane: beside the document on a wide screen, gone where it would
+   squeeze the page. It follows the scroll, just under the signing bar. */
+.sign-pages { display: none; }
+@media (min-width: 1180px) {
+  .sign-doc { display: grid; grid-template-columns: 1fr 190px; gap: 24px; align-items: start; }
+  .sign-pages {
+    display: flex; flex-direction: column; position: sticky; top: 124px;
+    max-height: calc(100vh - 148px); padding: 14px 10px 10px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  }
+  .sign-pages h3 {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-3); margin: 0 4px 12px; font-weight: 650;
+  }
+}
+.sign-pages-key { display: flex; align-items: center; gap: 6px; margin: 10px 4px 0; font-size: 11.5px; color: var(--text-3); }
+.sign-pages-key .key { width: 10px; height: 10px; border-radius: 2px; border: 1.5px solid #e8a317; background: color-mix(in srgb, #e8a317 55%, transparent); }
+.sign-pages-key .key.done { border-color: #1f9d61; background: color-mix(in srgb, #1f9d61 55%, transparent); margin-left: 8px; }
+/* A short document must not leave a pale band between it and the bar. */
+body:has(.sign-doc) { background: var(--surface-3); }
+
+.sign-bar {
+  position: sticky; top: 56px; z-index: 30;
+  background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: var(--sh-sm);
+}
+.sign-bar-inner {
+  max-width: 908px; margin: 0 auto; padding: 10px 24px;
+  display: flex; align-items: center; gap: 10px;
+}
+.sign-progress { margin-right: auto; font-size: 13.5px; color: var(--text-2); }
+.sign-progress strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.sign-decline { color: var(--text-3); font-size: 13.5px; }
+.sign-decline:hover { color: var(--bad); }
+.sign-error { max-width: 860px; margin: 0 auto 10px; }
+
+/* Finish takes the emphasis once nothing required is left. */
+.btn.pulse-btn { animation: pulse-btn 1.6s ease-out 2; }
+@keyframes pulse-btn {
+  0%, 100% { box-shadow: 0 0 0 0 var(--brand-ring); }
+  40% { box-shadow: 0 0 0 8px var(--brand-ring); }
+}
+
+/* The welcome popup: who is asking, the message, what signing records, consent. */
+.modal.welcome { width: min(600px, 100%); }
+.welcome-message {
+  margin: 0 0 16px; padding: 12px 14px; border-left: 3px solid var(--brand);
+  background: var(--surface-2); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 14px; color: var(--text-2); white-space: pre-line;
+}
+.welcome-terms {
+  padding: 13px 15px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+  font-size: 12.5px; line-height: 1.55; color: var(--text-2);
+}
+.welcome-terms strong { display: block; margin-bottom: 5px; color: var(--text); font-size: 13px; }
+.welcome-consent { margin: 16px 0 6px; }
+.welcome-actions { justify-content: space-between; margin-top: 14px; }
+.welcome-fine { font-size: 11.5px; margin-top: 12px; }
 
 .sfld {
   position: absolute; z-index: 2; box-sizing: border-box; border-radius: 4px;
@@ -796,21 +915,6 @@ body.no-scroll { display: flex; flex-direction: column; }
   0%, 100% { box-shadow: 0 0 0 0 rgba(18, 102, 224, 0); }
   40% { box-shadow: 0 0 0 7px rgba(18, 102, 224, .3); }
 }
-
-.todo-list { list-style: none; margin: 0; padding: 0; font-size: 13.5px; }
-.todo-list li {
-  display: flex; gap: 10px; align-items: center; padding: 9px 10px;
-  border-radius: var(--r-sm); cursor: pointer; border: 1px solid transparent;
-}
-.todo-list li:hover { background: var(--surface-2); }
-.todo-list .tick {
-  width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--border-strong);
-  flex: none; display: grid; place-items: center; font-size: 10px; color: #fff;
-}
-.todo-list li.done .tick { background: var(--ok); border-color: var(--ok); }
-.todo-list li.done { color: var(--text-3); }
-
-.sheet-scrim { position: fixed; inset: 0; background: rgba(8, 11, 18, .45); z-index: 55; }
 
 /* ---------------------------------------------------------------- modal ---- */
 
@@ -1250,9 +1354,10 @@ fieldset.card + .card, .card + fieldset.card { margin-top: 16px; }
 
   /* Touch-sized: the palette is now tapped, not dragged. */
   .palette-grid { gap: 9px; }
-  .chip { padding: 13px 8px; font-size: 12.5px; min-height: 44px; display: grid; place-items: center; }
-  .recip-list li { padding: 11px 9px; min-height: 44px; }
-  .zoombar button { width: 40px; height: 40px; font-size: 18px; }
+  .chip { min-height: 64px; }
+  .zoombar { height: 44px; }
+  .recip-pick select { font-size: 16px; }
+  .zoombar button { min-width: 42px; font-size: 18px; }
 
   /* The toolbar gains two drawer toggles here and the controls grow to touch
      size, so it must be allowed to wrap from the same breakpoint. */
@@ -1287,44 +1392,17 @@ fieldset.card + .card, .card + fieldset.card { margin-top: 16px; }
   .app-main main { padding: 20px 0 44px; }
 }
 
-/* ---- the signing panel becomes a bottom sheet ---- */
-@media (max-width: 900px) {
-  .sign-layout { grid-template-columns: 1fr; }
-  .sign-doc { padding: 12px 10px calc(var(--sheet-peek) + 24px); }
-  .sign-side {
-    --sheet-peek: 62px;
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
-    border-left: 0; border-top: 1px solid var(--border);
-    border-radius: var(--r-xl) var(--r-xl) 0 0;
-    box-shadow: var(--sh-pop);
-    max-height: 88vh; overflow-y: auto;
-    padding: 0 16px calc(18px + env(safe-area-inset-bottom));
-    transform: translateY(calc(100% - var(--sheet-peek)));
-    transition: transform .22s ease;
+/* ---- on a phone the signing bar moves to the bottom, within thumb reach ---- */
+@media (max-width: 720px) {
+  .sign-bar {
+    position: fixed; top: auto; left: 0; right: 0; bottom: 0;
+    border-bottom: 0; border-top: 1px solid var(--border); box-shadow: var(--sh-pop);
+    padding-bottom: env(safe-area-inset-bottom);
   }
-  .sign-side.open { transform: none; }
-
-  .sheet-handle {
-    display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;
-    position: sticky; top: 0; z-index: 2;
-    width: calc(100% + 32px); margin: 0 -16px 6px; padding: 15px 16px 12px;
-    background: var(--surface); border: 0; border-radius: var(--r-xl) var(--r-xl) 0 0;
-    font: inherit; text-align: left; cursor: pointer; min-height: var(--sheet-peek);
-  }
-  .sheet-grip {
-    position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
-    width: 38px; height: 4px; border-radius: 2px; background: var(--border-strong);
-  }
-  .sheet-label { font-size: 13.5px; color: var(--text-2); }
-  .sheet-cta {
-    font-size: 13.5px; font-weight: 650; color: var(--brand-fg);
-    background: var(--brand); padding: 10px 17px; border-radius: var(--r-sm);
-  }
-  .sign-side.open .sheet-cta::after { content: ' ▾'; }
-  .sign-side:not(.open) .sheet-cta::after { content: ' ▴'; }
-  .sign-side > :not(.sheet-handle) { display: none; }
-  .sign-side.open > * { display: revert; }
-  .sign-side.open .todo-list { display: block; }
+  .sign-bar-inner { padding: 10px 14px; gap: 8px; }
+  .sign-progress { font-size: 12.5px; }
+  .sign-doc { padding: 12px 10px calc(84px + env(safe-area-inset-bottom)); }
+  .sign-error { margin: 0 14px 10px; }
 }
 
 @media (max-width: 820px) {
@@ -1418,3 +1496,25 @@ fieldset.card + .card, .card + fieldset.card { margin-top: 16px; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ------------------------------------------------------------ bulk send ---- */
+
+.bulk-num {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 9px;
+  border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-size: 12.5px; font-weight: 700;
+  vertical-align: 2px;
+}
+.bulk-cols { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 16px; }
+.bulk-cols code {
+  font-size: 12.5px; padding: 4px 8px; border-radius: 6px;
+  background: var(--surface-3); border: 1px solid var(--border); color: var(--text-2);
+}
+.bulk-table { overflow-x: auto; margin-top: 14px; }
+.bulk-table td { vertical-align: top; }
+tr.bulk-bad td { background: var(--bad-bg); }
+.bulk-bad-text { color: var(--bad); font-weight: 600; }
+.bulk-warn-text { color: var(--warn); font-weight: 600; }
+.bulk-ok-text { color: var(--ok); font-weight: 600; }
+.bulk-progress { height: 10px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+.bulk-progress span { display: block; height: 100%; background: var(--brand); transition: width .3s; }
+.bulk-summary { margin: 14px 0 6px; font-size: 15px; }

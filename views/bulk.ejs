@@ -1,0 +1,176 @@
+<%- include('partials/head', { title: 'Bulk send ' + template.title }) %>
+<%- include('partials/shell-start') %>
+
+  <div class="wrap" style="max-width:860px">
+    <%- include('partials/steps', { steps: [
+      { label: 'Choose template', state: 'done' },
+      { label: 'Upload recipients', state: review ? 'done' : 'current' },
+      { label: 'Review', state: review ? 'current' : 'todo' },
+      { label: 'Send', state: 'todo' },
+    ] }) %>
+    <div class="page-head">
+      <div>
+        <h1>Bulk send</h1>
+        <p class="sub">
+          <%= template.title %> · signed by <%= roles.map(function (r) { return r.name; }).join(', ') || '—' %> ·
+          one document per row of your file
+        </p>
+      </div>
+    </div>
+
+    <% if (error) { %><div class="notice notice-bad" style="margin-top:0;margin-bottom:18px"><%= error %></div><% } %>
+    <% if (!fieldCount) { %>
+      <div class="notice notice-warn" style="margin-top:0;margin-bottom:18px">
+        This template has no fields yet, so there is nothing for anyone to sign. Place its fields before sending it in bulk.
+      </div>
+    <% } %>
+
+    <% if (!review) { %>
+      <div class="card">
+        <h2><span class="bulk-num">1</span>Download the blank CSV</h2>
+        <p class="hint">
+          It has a column for each person who signs this template, in the order they sign. Fill in one row per
+          document — in Excel, Google Sheets or any spreadsheet — and save it as CSV.
+        </p>
+        <div class="bulk-cols">
+          <% columns.forEach(function (c) { %><code><%= c %></code><% }); %>
+        </div>
+        <a class="btn btn-ghost" href="/templates/<%= template.id %>/bulk.csv" download>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"></path><path d="m7.5 11.5 4.5 4.5 4.5-4.5"></path><path d="M4 20h16"></path></svg>
+          Download blank CSV
+        </a>
+        <p class="hint" style="margin-bottom:0">
+          Leave the title column empty to name each document “<%= template.title %> — <i>name</i>”.
+          Up to <%= maxRows %> rows per file.
+        </p>
+      </div>
+
+      <form class="card" method="post" action="/templates/<%= template.id %>/bulk" enctype="multipart/form-data">
+        <h2><span class="bulk-num">2</span>Upload the completed file</h2>
+        <p class="hint">Nothing is sent yet — you will see every row first, and anything that needs fixing.</p>
+        <div class="field" style="margin-top:14px">
+          <%- include('partials/dropzone', {
+                id: 'csv-input',
+                name: 'csv',
+                accept: '.csv,text/csv',
+                maxMb: 1,
+                title: 'Drag your CSV here',
+                sub: 'CSV only, up to 1 MB'
+              }) %>
+        </div>
+        <div class="btn-row">
+          <button class="btn" type="submit">Check file</button>
+          <a class="btn btn-ghost" href="/templates">Cancel</a>
+        </div>
+      </form>
+
+      <% if (batches.length) { %>
+        <div class="card">
+          <h2>Earlier bulk sends of this template</h2>
+          <table>
+            <thead><tr><th>Started</th><th>Documents</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <% batches.forEach(function (b) { %>
+                <tr>
+                  <td class="td-primary"><%= new Date(b.created_at).toLocaleString() %></td>
+                  <td data-label="Documents"><%= b.sent + b.undelivered %> of <%= b.total %></td>
+                  <td data-label="Status"><span class="pill pill-<%= b.status === 'finished' ? 'completed' : b.status === 'running' ? 'sent' : 'declined' %>"><%= b.status %></span></td>
+                  <td class="td-action"><a class="btn btn-ghost btn-sm" href="/bulk/<%= b.id %>">View</a></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+    <% } else { %>
+      <div class="card">
+        <h2>Check the recipients</h2>
+        <p class="hint">
+          From <b><%= review.filename %></b>:
+          <b><%= review.ready %></b> document<%= review.ready === 1 ? '' : 's' %> ready to send<% if (review.skipped) { %>,
+          <b class="bulk-bad-text"><%= review.skipped %></b> row<%= review.skipped === 1 ? '' : 's' %> with a problem that will be skipped<% } %>.
+        </p>
+        <% if (review.skipped) { %>
+          <p class="hint">To include those, fix them in your file and upload it again.</p>
+        <% } %>
+        <div class="bulk-table">
+          <table>
+            <thead>
+              <tr><th>Row</th><th>Document</th><% roles.forEach(function (r) { %><th><%= r.name %></th><% }); %><th></th></tr>
+            </thead>
+            <tbody>
+              <% review.rows.forEach(function (row) { %>
+                <tr class="<%= row.problems.length ? 'bulk-bad' : '' %>">
+                  <td data-label="Row" class="hint"><%= row.line %></td>
+                  <td data-label="Document" class="td-primary"><%= row.title %></td>
+                  <% row.people.forEach(function (p, k) { %>
+                    <td data-label="<%= roles[k].name %>"><%= p.name || '—' %><div class="hint" style="margin:2px 0 0"><%= p.email || '—' %></div></td>
+                  <% }); %>
+                  <td>
+                    <% if (row.problems.length) { %>
+                      <span class="bulk-bad-text"><%= row.problems.join('; ') %></span>
+                    <% } else { %>
+                      <span class="pill pill-completed">ready</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <% if (review.ready && fieldCount) { %>
+        <form method="post" action="/templates/<%= template.id %>/bulk/send">
+          <div class="card">
+            <h2>For every document</h2>
+            <div class="field" style="margin-top:12px">
+              <label for="message">Message to recipients <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
+              <textarea id="message" name="message"><%= values.message %></textarea>
+            </div>
+            <div class="grid-2">
+              <div class="field" style="margin-bottom:0">
+                <label for="expires_in_days">Expires in (days)</label>
+                <input id="expires_in_days" name="expires_in_days" type="number" value="<%= values.expires %>" min="1" max="365">
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label for="reminder_days">Automatic reminders</label>
+                <select id="reminder_days" name="reminder_days">
+                  <% reminderChoices.forEach(function (c) { %>
+                    <option value="<%= c[0] %>" <%= c[0] === values.reminders ? 'selected' : '' %>><%= c[1] %></option>
+                  <% }); %>
+                </select>
+              </div>
+            </div>
+            <p class="hint">Anyone who has not signed is sent their link again on this schedule until they sign or the document expires.</p>
+          </div>
+
+          <div class="btn-row" style="margin-top:18px">
+            <button class="btn" type="submit" id="bulk-send">
+              Send <%= review.ready %> document<%= review.ready === 1 ? '' : 's' %>
+            </button>
+            <a class="btn btn-ghost" href="/templates/<%= template.id %>/bulk">Upload a different file</a>
+          </div>
+          <p class="hint">Each person gets their own document and signing link. Sending carries on if you leave the page.</p>
+        </form>
+      <% } else { %>
+        <div class="btn-row" style="margin-top:18px">
+          <a class="btn" href="/templates/<%= template.id %>/bulk">Upload a different file</a>
+        </div>
+      <% } %>
+    <% } %>
+  </div>
+
+<script src="/static/js/dropzone.js?v=<%= v %>" defer></script>
+<script src="/static/js/expiry-reminders.js?v=<%= v %>" defer></script>
+<script>
+  // One click, one batch: a double-click must not send everything twice.
+  document.addEventListener('submit', function (e) {
+    var b = e.target.querySelector('#bulk-send');
+    if (b) { b.disabled = true; b.textContent = 'Starting…'; }
+  });
+</script>
+
+<%- include('partials/shell-end') %>

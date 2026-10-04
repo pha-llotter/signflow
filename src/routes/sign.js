@@ -116,7 +116,7 @@ router.get('/sign/:token', loadByToken, (req, res) => {
     pageSizes: JSON.parse(doc.page_sizes || '[]'),
     fieldTypes: FIELD_TYPES,
     token: req.params.token,
-    dataRegion: config.dataRegion,
+    dataRegion: config.dataRegionShort,
   });
 });
 

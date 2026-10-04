@@ -123,6 +123,62 @@ try {
   check('another company does not see a team template', !(await text(head, '/templates')).includes('Protea Indemnity'));
   check('...cannot open it to use, or fetch its PDF', (await head('GET', `/templates/${tplId}/use`)).status === 404 && (await head('GET', `/documents/${tplId}/original.pdf`)).status === 404);
 
+  console.log('\nbulk send');
+  const parentRole = db.prepare('SELECT id FROM recipients WHERE document_id = ?').get(tplId).id;
+  await owner('PUT', `/api/documents/${tplId}/fields`, { headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ fields: [{ id: crypto.randomUUID(), type: 'signature', recipient_id: parentRole, page: 0, x: .2, y: .6, w: .3, h: .08 }] }) });
+  res = await owner('GET', `/templates/${tplId}/bulk.csv`);
+  const blank = Buffer.from(await res.arrayBuffer());
+  check('the blank CSV downloads as a CSV attachment',
+    res.status === 200 && /text\/csv/.test(res.headers.get('content-type')) && /attachment/.test(res.headers.get('content-disposition')));
+  check('...starts with a UTF-8 byte-order mark, for Excel', blank[0] === 0xef && blank[1] === 0xbb && blank[2] === 0xbf);
+  check('...and has a name and email column per role, plus a title', blank.toString('utf8').slice(1) === 'Parent name,Parent email,Document title (optional)\r\n', JSON.stringify(blank.toString('utf8')));
+  check('another company cannot open the bulk page or the blank CSV',
+    (await head('GET', `/templates/${tplId}/bulk`)).status === 404 && (await head('GET', `/templates/${tplId}/bulk.csv`)).status === 404);
+  check('Bulk send is in the Create new menu and on template cards',
+    (await text(owner, '/dashboard')).includes('href="/templates?for=bulk"') && (await text(owner, '/templates')).includes(`/templates/${tplId}/bulk"`));
+
+  const csvUpload = (content, name = 'people.csv') => { const b = new FormData(); b.append('csv', new Blob([content], { type: 'text/csv' }), name); return { body: b }; };
+  // Excel in a comma-decimal locale: semicolons, a BOM, CRLF, a quoted cell.
+  const csv = '﻿Parent name;Parent email;Document title (optional)\r\n'
+    + 'Thandi Mokoena;THANDI@example.test;\r\n'
+    + '"Lötter; Anna";anna@example.test;Indemnity — Anna\r\n'
+    + 'No Email;;\r\n'
+    + ';;\r\n'
+    + 'Bad Email;not-an-email;\r\n';
+  res = await owner('POST', `/templates/${tplId}/bulk`, csvUpload(csv));
+  const review = await res.text();
+  check('an upload is checked, not sent', res.status === 200 && review.includes('Check the recipients') && !db.prepare('SELECT 1 FROM bulk_batches').get());
+  check('...semicolons, the BOM and quoted cells are read', review.includes('Lötter; Anna') && review.includes('thandi@example.test'));
+  check('...2 ready, 2 with problems, blank lines ignored', review.includes('<b>2</b> documents ready') && review.includes('<b class="bulk-bad-text">2</b> rows'), review.match(/From <b>[\s\S]{0,300}/)?.[0]);
+  check('...each problem is named', review.includes('Parent email is missing') && review.includes('“not-an-email” is not valid'));
+  check('the wrong columns are refused with a pointer to the blank file',
+    (await (await owner('POST', `/templates/${tplId}/bulk`, csvUpload('Name,Email\nA,a@b.test\n'))).text()).includes('Download the blank CSV'));
+  check('another company cannot send from it',
+    (await head('POST', `/templates/${tplId}/bulk/send`, form({ expires_in_days: 7 }))).status === 404);
+
+  // Upload again: the last good check is what gets sent.
+  await owner('POST', `/templates/${tplId}/bulk`, csvUpload(csv));
+  res = await owner('POST', `/templates/${tplId}/bulk/send`, form({ message: 'Please sign', expires_in_days: 2, reminder_days: 3 }));
+  const batchUrl = loc(res);
+  check('sending starts a batch and shows its progress', /^\/bulk\/[0-9a-f-]{36}$/.test(batchUrl), batchUrl);
+  let batch;
+  for (let i = 0; i < 60; i++) { batch = db.prepare('SELECT * FROM bulk_batches').get(); if (batch.status !== 'running') break; await new Promise((r) => setTimeout(r, 100)); }
+  check('the batch finishes with every ready row processed', batch.status === 'finished' && batch.total === 2 && batch.sent + batch.undelivered === 2 && batch.failed === 0, JSON.stringify(batch));
+  const made = db.prepare(`SELECT d.*, r.name, r.email FROM documents d JOIN recipients r ON r.document_id = d.id WHERE d.bulk_batch_id = ? ORDER BY r.email`).all(batch.id);
+  check('one sent document per row, with that row\'s person',
+    made.length === 2 && made.every((d) => d.status === 'sent' && d.template_id === tplId && d.company_id === protea.id)
+    && made[0].email === 'anna@example.test' && made[0].name === 'Lötter; Anna' && made[1].email === 'thandi@example.test');
+  check('...titled from the file, or after the person', made[0].title === 'Indemnity — Anna' && made[1].title === 'Protea Indemnity — Thandi Mokoena');
+  check('...with the batch\'s message and expiry, and reminders fitted inside it',
+    made.every((d) => d.message === 'Please sign' && d.reminder_days < 2 && Math.abs(new Date(d.expires_at) - Date.now() - 2 * 864e5) < 6e4));
+  check('...and the fields copied from the template', made.every((d) => db.prepare('SELECT COUNT(*) AS n FROM fields WHERE document_id = ?').get(d.id).n === 1));
+  check('the checked list cannot be sent twice', (await owner('POST', `/templates/${tplId}/bulk/send`, form({ expires_in_days: 7 }))).status === 400
+    && db.prepare('SELECT COUNT(*) AS n FROM bulk_batches').get().n === 1);
+  const batchPage = await text(owner, batchUrl);
+  check('the progress page lists the documents', batchPage.includes('Indemnity — Anna') && batchPage.includes('thandi@example.test'));
+  check('another company cannot see the batch', (await head('GET', batchUrl)).status === 404);
+
   // Waiting-for-me across companies.
   const cross = await sendDoc(owner, 'Protea to Riverside head', 'Riverside Head', 'head@riverside.test');
   check('documents carry the sender\'s company', db.prepare('SELECT company_id FROM documents WHERE id=?').get(cross.id).company_id === protea.id);

@@ -371,8 +371,14 @@ try {
     (await sign.evaluate(() => window.scrollY)) > before,
     `scrollY ${before} → ${await sign.evaluate(() => window.scrollY)}`);
 
-  check('the bottom sheet shows progress without covering the document',
-    await sign.locator('#sheet-toggle').isVisible());
+  // Consent first, in the welcome popup; then the bar sits at the bottom.
+  await sign.tap('#consent');
+  await sign.tap('#welcome-continue');
+  await sign.waitForTimeout(400);
+  const barBox = await sign.locator('#sign-bar').boundingBox();
+  const vh = sign.viewportSize().height;
+  check('the signing bar sits at the bottom of the screen, within thumb reach',
+    !!barBox && barBox.y + barBox.height >= vh - 2 && barBox.height < 90, JSON.stringify(barBox));
 
   await sign.locator('.sfld.mine').first().scrollIntoViewIfNeeded();
   await sign.waitForTimeout(200);
@@ -408,18 +414,12 @@ try {
   check('a finger-drawn signature is captured',
     (await sign.locator('.sfld.mine.done img').count()) >= 1);
 
-  // The sheet raises itself once every required field is done, so toggling
-  // blindly here would close it again.
-  const sheetAlreadyUp = await sign.evaluate(() =>
-    document.getElementById('sign-side').classList.contains('open'));
-  check('the sheet raises itself once the fields are complete', sheetAlreadyUp);
-  if (!sheetAlreadyUp) await sign.tap('#sheet-toggle');
-  await sign.waitForTimeout(350);
-  await sign.locator('#consent').check();
-  await sign.waitForTimeout(200);
-  check('Finish enables once consent is given', !(await sign.locator('#finish-btn').isDisabled()));
+  check('Finish enables once the fields are complete', !(await sign.locator('#finish-btn').isDisabled()));
 
   await sign.tap('#finish-btn');
+  await sign.waitForSelector('.modal', { timeout: 5000 });
+  check('Finish asks for confirmation first', /cannot be changed/.test(await sign.locator('.modal').innerText()));
+  await sign.tap('.modal #m-ok');
   await sign.waitForURL('**/done', { timeout: 25000 });
   check('a document can be signed end to end from a phone', true);
   await sign.screenshot({ path: path.join(OUT, '6-sign-done-mobile.png') });

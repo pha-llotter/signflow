@@ -2,12 +2,17 @@
  * The signing page.
  *
  * Renders the document as the author laid it out, overlays only the fields
- * addressed to this signer as fillable, and collects their answers. Nothing is
- * committed until the signer ticks consent and presses Finish — the server
- * re-checks both, so this is convenience, not the control.
+ * addressed to this signer as fillable, and collects their answers.
+ *
+ * The flow is three popups around a full-width document: a welcome that takes
+ * consent before anything can be filled in, the document itself guided by a
+ * Next field button, and a confirmation on Finish. Nothing is committed until
+ * that confirmation — and the server re-checks consent and every required
+ * field, so all of this is convenience, not the control.
  */
 import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
 import { openSignaturePad, openDrawingPad } from '/static/js/signature-pad.js';
+import { createThumbs } from '/static/js/page-thumbs.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/vendor/pdfjs/pdf.worker.min.mjs';
 
@@ -17,18 +22,22 @@ const BASE_WIDTH = 860;
 const values = {};   // field id -> value going to the server
 const files = {};    // field id -> { name, mime, dataUrl } for attachment fields
 let pageEls = [];
+let pdfDoc = null;
+let thumbs = null;
 
 const el = {
   pages: document.getElementById('pages'),
-  todo: document.getElementById('todo-list'),
   doneCount: document.getElementById('done-count'),
   consent: document.getElementById('consent'),
   finish: document.getElementById('finish-btn'),
+  next: document.getElementById('next-btn'),
   error: document.getElementById('sign-error'),
-  side: document.getElementById('sign-side'),
-  sheetToggle: document.getElementById('sheet-toggle'),
-  sheetProgress: document.getElementById('sheet-progress'),
+  welcome: document.getElementById('welcome'),
+  welcomeContinue: document.getElementById('welcome-continue'),
 };
+
+// Consent is given once, in the welcome popup, and carried to the submit.
+let consented = false;
 
 const myFields = S.fields.filter(
   (f) => f.recipient_id === S.recipientId && S.fieldTypes[f.type].fill === 'signer'
@@ -37,15 +46,15 @@ const myFields = S.fields.filter(
 /* ------------------------------------------------------------------ render */
 
 async function render() {
-  const pdf = await pdfjsLib.getDocument({ url: S.pdfUrl, withCredentials: true }).promise;
+  // Loaded once; a resize only lays the pages out again.
+  pdfDoc ??= await pdfjsLib.getDocument({ url: S.pdfUrl, withCredentials: true }).promise;
+  const pdf = pdfDoc;
   el.pages.innerHTML = '';
   pageEls = [];
 
-  // Measure the container's real content box rather than assuming the padding,
-  // which differs between the desktop and phone layouts.
-  const holderEl = el.pages.parentElement;
-  const cs = getComputedStyle(holderEl);
-  const inner = holderEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  // Measure the column the pages actually get — beside the pages pane on a
+  // wide screen, the whole width on a phone — rather than assuming it.
+  const inner = el.pages.clientWidth;
   const available = Math.max(240, Math.min(inner, BASE_WIDTH));
 
   for (let i = 0; i < pdf.numPages; i++) {
@@ -76,6 +85,27 @@ async function render() {
   }
 
   drawFields();
+
+  // The pages pane beside the document: where this signer's fields are, and
+  // which are still to do.
+  const list = document.getElementById('sign-thumbs');
+  if (!thumbs && list) {
+    thumbs = createThumbs({
+      pdf, list, scroller: () => document.documentElement, pageEls: () => pageEls,
+      markClass: (f) => (f.mine ? (f.done ? 'done' : 'todo') : 'theirs'),
+    });
+    thumbs.build().then(markThumbs);
+  }
+}
+
+function markThumbs() {
+  thumbs?.mark(S.fields
+    .filter((f) => !['label', 'hyperlink', 'qrcode', 'stamp'].includes(f.type))
+    .map((f) => {
+      // The signer's own automatic fields (name, date) fill themselves, so they count as done.
+      const own = f.recipient_id === S.recipientId;
+      return { ...f, mine: own, done: myFields.includes(f) ? isFilled(f) : own };
+    }));
 }
 
 function drawFields() {
@@ -270,103 +300,99 @@ function pickOption(f) {
 
 /* -------------------------------------------------------------- progress */
 
+const isFilled = (f) => {
+  const v = values[f.id];
+  return f.type === 'checkbox' ? v === true : v != null && v !== '';
+};
+
+// Fields in reading order — page, then down the page, then across.
+const inOrder = () => [...myFields].sort((a, b) => a.page - b.page || a.y - b.y || a.x - b.x);
+
 function updateProgress() {
-  let done = 0;
-  for (const f of myFields) {
-    const v = values[f.id];
-    const filled = f.type === 'checkbox' ? v === true : v != null && v !== '';
-    if (filled) done++;
-    const li = el.todo.querySelector(`li[data-id="${f.id}"]`);
-    if (li) li.classList.toggle('done', filled);
-  }
+  const done = myFields.filter(isFilled).length;
   el.doneCount.textContent = String(done);
-  el.sheetProgress.textContent = `${done} of ${myFields.length}`;
-
-  const allRequired = myFields.every((f) => {
-    if (!f.required) return true;
-    const v = values[f.id];
-    return f.type === 'checkbox' ? v === true : v != null && v !== '';
-  });
-  el.finish.disabled = !(allRequired && el.consent.checked);
-
-  // Once there is nothing left to fill, bring the sheet up on its own — the
-  // consent box and Finish button live inside it, so leaving it shut would
-  // look like a dead end.
-  if (allRequired && !sheetOpen() && isSheetLayout()) openSheet();
+  const allRequired = myFields.every((f) => !f.required || isFilled(f));
+  el.finish.disabled = !(allRequired && consented);
+  // Once nothing required is left, Next field has done its job and Finish is
+  // the thing to press — it says so by taking the emphasis.
+  el.finish.classList.toggle('pulse-btn', allRequired && consented);
+  el.next.textContent = allRequired ? 'Review fields' : 'Next field';
+  markThumbs();
 }
 
-el.consent.addEventListener('change', updateProgress);
-
-/* ------------------------------------------------ the mobile bottom sheet */
-
-// The sheet only exists below the layout breakpoint; above it the panel is
-// always visible and the handle is hidden, so these become no-ops.
-const isSheetLayout = () => getComputedStyle(el.sheetToggle).display !== 'none';
-const sheetOpen = () => el.side.classList.contains('open');
-
-let scrim = null;
-
-function openSheet() {
-  el.side.classList.add('open');
-  el.sheetToggle.setAttribute('aria-expanded', 'true');
-  if (!scrim) {
-    scrim = document.createElement('div');
-    scrim.className = 'sheet-scrim';
-    scrim.addEventListener('click', closeSheet);
-    document.body.appendChild(scrim);
-  }
-}
-
-function closeSheet() {
-  el.side.classList.remove('open');
-  el.sheetToggle.setAttribute('aria-expanded', 'false');
-  scrim?.remove();
-  scrim = null;
-}
-
-el.sheetToggle.addEventListener('click', () => (sheetOpen() ? closeSheet() : openSheet()));
-
-// Returning to a wide window must not leave an orphaned scrim over the page.
-window.addEventListener('resize', () => { if (!isSheetLayout()) closeSheet(); });
-
-el.todo.addEventListener('click', (e) => {
-  const li = e.target.closest('li');
-  if (!li) return;
-  const node = document.querySelector(`.sfld[data-id="${li.dataset.id}"]`);
+/** Scrolls to the next field still to fill (required first) and highlights it. */
+el.next.addEventListener('click', () => {
+  const order = inOrder();
+  const target =
+    order.find((f) => f.required && !isFilled(f)) ||
+    order.find((f) => !isFilled(f)) ||
+    order[0];
+  if (!target) return;
+  const node = document.querySelector(`.sfld[data-id="${target.id}"]`);
   if (!node) return;
-  // Get the sheet out of the way, or it covers the field being jumped to.
-  closeSheet();
   node.scrollIntoView({ behavior: 'smooth', block: 'center' });
   node.classList.remove('pulse');
   void node.offsetWidth;
   node.classList.add('pulse');
 });
 
+/* --------------------------------------------------------------- welcome */
+
+el.consent.addEventListener('change', () => { el.welcomeContinue.disabled = !el.consent.checked; });
+el.welcomeContinue.addEventListener('click', () => {
+  if (!el.consent.checked) return;
+  consented = true;
+  el.welcome.remove();
+  updateProgress();
+  // Straight to the first thing to fill, so the signer is never left looking
+  // for where to start.
+  if (myFields.length) setTimeout(() => el.next.click(), 150);
+});
+
 /* ---------------------------------------------------------------- submit */
 
+/** The last chance to look again: what is about to be signed, and as whom. */
+function confirmSigning() {
+  const done = myFields.filter(isFilled).length;
+  return modal(
+    `<h2>Sign “${escapeHtml(S.title)}”?</h2>
+     <p class="sub">You are signing as <strong>${escapeHtml(S.recipientName)}</strong> (${escapeHtml(S.recipientEmail)}),
+       with ${done} of ${myFields.length} field${myFields.length === 1 ? '' : 's'} completed.
+       Once signed, it cannot be changed or withdrawn.</p>
+     <div class="btn-row"><button class="btn" id="m-ok">Sign</button>
+     <button class="btn btn-ghost" id="m-cancel">Go back</button></div>`,
+    (m, close) => {
+      m.querySelector('#m-ok').addEventListener('click', () => close(true));
+      m.querySelector('#m-cancel').addEventListener('click', () => close(null));
+      m.querySelector('#m-ok').focus();
+    }
+  );
+}
+
 el.finish.addEventListener('click', async () => {
+  if (!(await confirmSigning())) return;
   el.finish.disabled = true;
   el.finish.textContent = 'Sealing…';
-  el.error.style.display = 'none';
+  el.error.hidden = true;
 
   try {
     const res = await fetch(`/sign/${S.token}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ consent: true, values, files }),
+      body: JSON.stringify({ consent: consented, values, files }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `Could not save (HTTP ${res.status}).`);
     window.location = data.redirect;
   } catch (err) {
     el.error.textContent = err.message;
-    el.error.style.display = 'block';
+    el.error.hidden = false;
     el.finish.disabled = false;
-    el.finish.textContent = 'Finish signing';
+    el.finish.textContent = 'Finish';
   }
 });
 
-document.getElementById('decline-btn').addEventListener('click', async () => {
+async function decline() {
   const reason = await modal(
     `<h2>Decline to sign</h2>
      <p class="sub">The sender will be told. You will not be able to sign this document afterwards.</p>
@@ -381,7 +407,9 @@ document.getElementById('decline-btn').addEventListener('click', async () => {
   if (reason == null) return;
   document.getElementById('decline-reason').value = reason;
   document.getElementById('decline-form').submit();
-});
+}
+document.getElementById('decline-btn').addEventListener('click', decline);
+document.getElementById('welcome-decline').addEventListener('click', decline);
 
 render();
 window.addEventListener('resize', () => { clearTimeout(window.__rt); window.__rt = setTimeout(render, 250); });

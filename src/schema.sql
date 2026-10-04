@@ -186,3 +186,20 @@ CREATE TABLE IF NOT EXISTS companies (
   updated_at     TEXT,
   updated_by     TEXT
 );
+
+-- One bulk send: a template sent to every row of an uploaded CSV, each row
+-- its own document. Sending runs in the background; this is its progress.
+CREATE TABLE IF NOT EXISTS bulk_batches (
+  id             TEXT PRIMARY KEY,
+  company_id     TEXT,
+  owner_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  template_id    TEXT,
+  template_title TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  finished_at    TEXT,
+  status         TEXT NOT NULL DEFAULT 'running',
+  total          INTEGER NOT NULL DEFAULT 0,
+  sent           INTEGER NOT NULL DEFAULT 0,
+  undelivered    INTEGER NOT NULL DEFAULT 0,
+  failed         INTEGER NOT NULL DEFAULT 0
+);

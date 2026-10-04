@@ -8,20 +8,26 @@
  * happened to be looking at.
  */
 import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
+import { createThumbs } from '/static/js/page-thumbs.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/vendor/pdfjs/pdf.worker.min.mjs';
 
 const DOC = window.__DOC__;
 const RECIPIENT_COLORS = ['#2b5bd7', '#b8410e', '#17734a', '#6d3fb8', '#a8850c', '#0f6f86'];
-const MAX_WIDTH = 820;           // CSS px for a page at 100% on a wide screen
 const MIN_WIDTH = 280;
 const GRID_PX = 20;
+// 100% is the page at its printed size: a PDF point is 1/72 inch, a CSS pixel 1/96.
+const PX_PER_PT = 96 / 72;
+const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+// How close, in screen pixels, an edge must come to another before it snaps.
+const ALIGN_PX = 6;
 
 const state = {
   fields: DOC.fields.map(normalise),
   activeRecipient: DOC.recipients[0]?.id || null,
   selectedId: null,
   zoom: 1,
+  fit: true,       // re-fit when the window changes, until the author picks a zoom
   snap: true,
   dirty: false,
   armedType: null,
@@ -56,43 +62,57 @@ const colorFor = (recipientId) => {
   return i < 0 ? '#5a6472' : RECIPIENT_COLORS[i % RECIPIENT_COLORS.length];
 };
 
-document.querySelectorAll('[data-swatch]').forEach((s) => {
-  s.style.background = colorFor(s.dataset.swatch);
-});
 
 /* ------------------------------------------------------------------ render */
 
 let pageEls = [];
 
 /**
- * Page width at 100% zoom: the column it has to live in, capped so it does not
- * become gigantic on a wide monitor.
- *
- * A fixed width is what made this unusable on a phone — an 820px page inside a
- * 390px column means you are looking at half a document through a letterbox and
- * tapping where you cannot see. Zooming past 100% still overflows and scrolls,
- * which is the point of zooming.
+ * The width the page column offers. "Fit" sizes the widest page to it, but
+ * never past its printed size — on a wide monitor a page blown up to fill the
+ * screen is harder to work on, not easier. Fitting is what makes a phone
+ * usable at all: an 800px page in a 390px column is half a document seen
+ * through a letterbox.
  */
-function fitWidth() {
+function availableWidth() {
   const cs = getComputedStyle(el.area);
   const inner = el.area.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  return Math.max(MIN_WIDTH, Math.min(inner, MAX_WIDTH));
+  return Math.max(MIN_WIDTH, inner);
 }
 
+let pdfDoc = null;
+const pdfPages = [];
+let thumbs = null;
+let renderSeq = 0;
+
+const fitZoom = () => {
+  const widest = Math.max(...pdfPages.map((p) => p.getViewport({ scale: 1 }).width));
+  return Math.min(1, availableWidth() / (widest * PX_PER_PT));
+};
+
 async function renderPdf() {
-  const pdf = await pdfjsLib.getDocument({ url: DOC.pdfUrl, withCredentials: true }).promise;
-  el.pages.innerHTML = '';
-  pageEls = [];
+  const seq = ++renderSeq;
+  if (!pdfDoc) {
+    pdfDoc = await pdfjsLib.getDocument({ url: DOC.pdfUrl, withCredentials: true }).promise;
+    for (let i = 0; i < pdfDoc.numPages; i++) pdfPages.push(await pdfDoc.getPage(i + 1));
+  }
+  if (seq !== renderSeq) return;
+  if (state.fit) state.zoom = fitZoom();
+  renderZoomLabel();
 
-  const base = fitWidth();
+  // Hold the point in the middle of the view where it is, so zooming closes in
+  // on what the author was looking at instead of jumping to the top.
+  const area = el.area;
+  const anchorY = area.scrollHeight > area.clientHeight ? (area.scrollTop + area.clientHeight / 2) / area.scrollHeight : 0;
+  const anchorX = area.scrollWidth > area.clientWidth ? (area.scrollLeft + area.clientWidth / 2) / area.scrollWidth : 0.5;
 
-  for (let i = 0; i < pdf.numPages; i++) {
-    const page = await pdf.getPage(i + 1);
+  // Lay every page out at its new size first — at once — and paint after.
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const jobs = [];
+  const fresh = pdfPages.map((page, i) => {
     // rotation defaults to the page's own /Rotate, which is what the server
     // compensates for when stamping — keep them in step.
-    const natural = page.getViewport({ scale: 1 });
-    const scale = (base * state.zoom) / natural.width;
-    const viewport = page.getViewport({ scale });
+    const viewport = page.getViewport({ scale: state.zoom * PX_PER_PT });
 
     const holder = document.createElement('div');
     holder.className = 'pdf-page';
@@ -102,7 +122,6 @@ async function renderPdf() {
 
     const canvas = document.createElement('canvas');
     // Render at device pixel ratio so text stays crisp, but lay out at CSS size.
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.floor(viewport.width * dpr);
     canvas.height = Math.floor(viewport.height * dpr);
     canvas.style.width = `${viewport.width}px`;
@@ -113,16 +132,31 @@ async function renderPdf() {
     badge.textContent = `Page ${i + 1}`;
 
     holder.append(canvas, badge);
-    el.pages.appendChild(holder);
-    pageEls.push(holder);
+    jobs.push({ page, canvas, viewport });
+    return holder;
+  });
 
+  el.pages.replaceChildren(...fresh);
+  pageEls = fresh;
+  drawFields();
+  if (anchorY) area.scrollTop = anchorY * area.scrollHeight - area.clientHeight / 2;
+  area.scrollLeft = anchorX * area.scrollWidth - area.clientWidth / 2;
+
+  if (!thumbs) {
+    thumbs = createThumbs({ pdf: pdfDoc, list: document.getElementById('thumbs'), scroller: () => el.area, pageEls: () => pageEls });
+    thumbs.build().then(markThumbs);
+  }
+
+  for (const { page, canvas, viewport } of jobs) {
+    if (seq !== renderSeq) return; // a newer zoom has taken over
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
     await page.render({ canvasContext: ctx, viewport }).promise;
+    canvas.parentElement.classList.add('painted');
   }
-
-  drawFields();
 }
+
+const markThumbs = () => thumbs?.mark(state.fields.map((f) => ({ ...f, color: colorFor(f.recipient_id) })));
 
 function drawFields() {
   pageEls.forEach((p) => p.querySelectorAll('.fld').forEach((n) => n.remove()));
@@ -134,6 +168,7 @@ function drawFields() {
     const node = document.createElement('div');
     node.className = 'fld' + (f.id === state.selectedId ? ' selected' : '');
     node.dataset.id = f.id;
+    node.dataset.type = f.type;
     node.style.left = `${f.x * 100}%`;
     node.style.top = `${f.y * 100}%`;
     node.style.width = `${f.w * 100}%`;
@@ -158,6 +193,7 @@ function drawFields() {
 
     holder.appendChild(node);
   }
+  markThumbs();
   renderGuidance();
 }
 
@@ -173,12 +209,19 @@ function labelFor(f) {
 
 /* -------------------------------------------------------------- recipients */
 
-document.getElementById('recip-list').addEventListener('click', (e) => {
-  const li = e.target.closest('li');
-  if (!li) return;
-  state.activeRecipient = li.dataset.id;
-  document.querySelectorAll('#recip-list li').forEach((n) => n.classList.toggle('active', n === li));
-});
+// The recipient's colour runs under the picker and tints the field tiles, so
+// it is plain whose fields are about to be placed — the same colour they take
+// on the page.
+const recipSelect = document.getElementById('recip-select');
+
+function setRecipient(id) {
+  state.activeRecipient = id;
+  if (recipSelect && recipSelect.value !== id) recipSelect.value = id;
+  document.getElementById('placer').style.setProperty('--active-recip', colorFor(id));
+}
+
+recipSelect?.addEventListener('change', () => setRecipient(recipSelect.value));
+if (state.activeRecipient) setRecipient(state.activeRecipient);
 
 /* -------------------------------------------------------- drag from palette */
 
@@ -336,6 +379,61 @@ function snapPx(px, py) {
   return { px: Math.round(px / GRID_PX) * GRID_PX, py: Math.round(py / GRID_PX) * GRID_PX };
 }
 
+/* ------------------------------------------------------- alignment guides */
+
+/**
+ * Smart guides. While a field is moved or resized, its edges and centre are
+ * compared with every other field on the page and with the page's centre
+ * lines; one that comes within a few pixels snaps into line, and a guide is
+ * drawn across the page to show what it lined up with. This wins over the
+ * grid — lining up with a real neighbour is what was meant. Alt places freely.
+ */
+function align(f, rect, mode) {
+  const others = state.fields.filter((o) => o.id !== f.id && o.page === f.page);
+  const targetsX = [0.5, ...others.flatMap((o) => [o.x, o.x + o.w / 2, o.x + o.w])];
+  const targetsY = [0.5, ...others.flatMap((o) => [o.y, o.y + o.h / 2, o.y + o.h])];
+
+  // The lines of this field that may move: all three when moving it, only the
+  // dragged corner's edges when resizing.
+  const linesX = mode === 'move' ? [0, f.w / 2, f.w] : [f.w];
+  const linesY = mode === 'move' ? [0, f.h / 2, f.h] : [f.h];
+
+  const nearest = (start, lines, targets, size) => {
+    let hit = null;
+    for (const off of lines) {
+      for (const t of targets) {
+        const gap = Math.abs(start + off - t) * size;
+        if (gap <= ALIGN_PX && (!hit || gap < hit.gap)) hit = { gap, delta: t - (start + off), at: t };
+      }
+    }
+    return hit;
+  };
+
+  const hx = nearest(f.x, linesX, targetsX, rect.width);
+  const hy = nearest(f.y, linesY, targetsY, rect.height);
+  if (mode === 'move') {
+    if (hx) f.x = clamp(f.x + hx.delta, 0, 1 - f.w);
+    if (hy) f.y = clamp(f.y + hy.delta, 0, 1 - f.h);
+  } else {
+    if (hx) f.w = clamp(f.w + hx.delta, 0.012, 1 - f.x);
+    if (hy) f.h = clamp(f.h + hy.delta, 0.008, 1 - f.y);
+  }
+  return { x: hx?.at, y: hy?.at };
+}
+
+function showGuides(holder, at) {
+  clearGuides();
+  for (const [dir, pos] of [['v', at.x], ['h', at.y]]) {
+    if (pos == null) continue;
+    const g = document.createElement('div');
+    g.className = `align-guide align-${dir}`;
+    g.style[dir === 'v' ? 'left' : 'top'] = `${pos * 100}%`;
+    holder.appendChild(g);
+  }
+}
+
+const clearGuides = () => document.querySelectorAll('.align-guide').forEach((g) => g.remove());
+
 /* ------------------------------------------------- move, resize and delete */
 
 let drag = null;
@@ -411,26 +509,29 @@ el.pages.addEventListener('pointermove', (e) => {
   if (drag.mode === 'move') {
     let px = (drag.origin.x + dx) * drag.rect.width;
     let py = (drag.origin.y + dy) * drag.rect.height;
-    ({ px, py } = snapPx(px, py));
+    if (!e.altKey) ({ px, py } = snapPx(px, py));
     f.x = clamp(px / drag.rect.width, 0, 1 - f.w);
     f.y = clamp(py / drag.rect.height, 0, 1 - f.h);
-    drag.node.style.left = `${f.x * 100}%`;
-    drag.node.style.top = `${f.y * 100}%`;
   } else {
     // A field smaller than a few pixels is impossible to grab again.
     f.w = clamp(drag.origin.w + dx, 0.012, 1 - f.x);
     f.h = clamp(drag.origin.h + dy, 0.008, 1 - f.y);
-    drag.node.style.width = `${f.w * 100}%`;
-    drag.node.style.height = `${f.h * 100}%`;
   }
+  if (e.altKey) clearGuides();
+  else showGuides(drag.node.parentElement, align(f, drag.rect, drag.mode));
+  drag.node.style.left = `${f.x * 100}%`;
+  drag.node.style.top = `${f.y * 100}%`;
+  drag.node.style.width = `${f.w * 100}%`;
+  drag.node.style.height = `${f.h * 100}%`;
 });
 
 const endDrag = () => {
   if (!drag) return;
   const moved = drag.moved;
   drag = null;
+  clearGuides();
   // Merely selecting a field should not mark the document unsaved.
-  if (moved) markDirty();
+  if (moved) { markDirty(); markThumbs(); }
 };
 
 // A swipe produces no click, so the chip stays armed and the author can scroll
@@ -480,6 +581,9 @@ function renderInspector() {
   const f = state.fields.find((x) => x.id === state.selectedId);
   el.noSelection.hidden = !!f;
   el.inspector.hidden = !f;
+  // One column: the pages, or the selected field's settings in their place.
+  document.getElementById('field-panel').hidden = !f;
+  document.getElementById('pages-panel').hidden = !!f;
   if (!f) return;
 
   const spec = DOC.fieldTypes[f.type];
@@ -598,13 +702,51 @@ const escapeHtml = (s) =>
 
 /* ------------------------------------------------------- zoom, grid, saving */
 
-function setZoom(z) {
-  state.zoom = clamp(z, 0.5, 2.5);
+function renderZoomLabel() {
   el.zoomLabel.textContent = `${Math.round(state.zoom * 100)}%`;
+  document.getElementById('zoom-fit').classList.toggle('on', state.fit);
+}
+
+function setZoom(z) {
+  state.fit = false;
+  state.zoom = clamp(z, ZOOM_STEPS[0], ZOOM_STEPS[ZOOM_STEPS.length - 1]);
   renderPdf();
 }
-document.getElementById('zoom-in').addEventListener('click', () => setZoom(state.zoom + 0.15));
-document.getElementById('zoom-out').addEventListener('click', () => setZoom(state.zoom - 0.15));
+
+// Steps rather than a fixed increment: the next sensible size up or down from
+// wherever Fit happened to leave it.
+const stepZoom = (dir) =>
+  setZoom(dir > 0
+    ? ZOOM_STEPS.find((z) => z > state.zoom + 0.005) ?? state.zoom
+    : [...ZOOM_STEPS].reverse().find((z) => z < state.zoom - 0.005) ?? state.zoom);
+
+function fitToWindow() {
+  state.fit = true;
+  renderPdf();
+}
+
+document.getElementById('zoom-in').addEventListener('click', () => stepZoom(1));
+document.getElementById('zoom-out').addEventListener('click', () => stepZoom(-1));
+document.getElementById('zoom-fit').addEventListener('click', fitToWindow);
+
+// Ctrl + wheel and Ctrl +/−/0 zoom the document, not the whole editor. A
+// trackpad pinch arrives as a burst of these, so they are gathered into one step.
+let wheelTimer = null;
+let wheelDir = 0;
+el.area.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  clearTimeout(wheelTimer);
+  wheelDir += Math.sign(e.deltaY);
+  wheelTimer = setTimeout(() => { if (wheelDir) stepZoom(-wheelDir); wheelDir = 0; }, 60);
+}, { passive: false });
+
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  if (e.key === '=' || e.key === '+') { e.preventDefault(); stepZoom(1); }
+  else if (e.key === '-') { e.preventDefault(); stepZoom(-1); }
+  else if (e.key === '0') { e.preventDefault(); fitToWindow(); }
+});
 
 document.getElementById('grid-toggle').addEventListener('change', (e) => {
   state.snap = e.target.checked;
@@ -641,10 +783,9 @@ function toggleDrawer(node) {
 document.getElementById('toggle-palette').addEventListener('click', () => toggleDrawer(palette));
 document.getElementById('toggle-inspector').addEventListener('click', () => toggleDrawer(inspectorEl));
 
-// Dropping a field or picking a recipient means the drawer has done its job.
-palette.addEventListener('click', (e) => {
-  if (e.target.closest('.recip-list li')) closeDrawers();
-});
+document.getElementById('field-done').addEventListener('click', () => { select(null); closeDrawers(); });
+// Picking a page in the drawer is the end of the drawer's job.
+document.getElementById('thumbs').addEventListener('click', (e) => { if (e.target.closest('.thumb')) closeDrawers(); });
 window.addEventListener('resize', () => {
   if (getComputedStyle(document.getElementById('toggle-palette')).display === 'none') closeDrawers();
 });
@@ -707,18 +848,18 @@ window.addEventListener('beforeunload', (e) => {
 // Rotating a phone changes the column width, and the page has to be re-fitted
 // to it. Field positions are fractions of the page, so nothing moves.
 let refitTimer = null;
-let lastFit = 0;
+let lastWidth = 0;
 window.addEventListener('resize', () => {
   clearTimeout(refitTimer);
   refitTimer = setTimeout(() => {
-    const next = fitWidth();
-    if (Math.abs(next - lastFit) < 2) return;
-    lastFit = next;
+    const next = availableWidth();
+    if (!state.fit || Math.abs(next - lastWidth) < 2) return;
+    lastWidth = next;
     renderPdf();
   }, 200);
 });
 
-lastFit = fitWidth();
+lastWidth = availableWidth();
 renderPdf();
 
 /* ------------------------------------------------------------ diagnostics */
