@@ -7,6 +7,8 @@
  * boot — there is no separate migrate command to forget.
  */
 
+import crypto from 'node:crypto';
+
 function columns(db, table) {
   return new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name));
 }
@@ -22,6 +24,27 @@ export function migrate(db, nowIso) {
   addUserColumn('status', `TEXT NOT NULL DEFAULT 'active'`);
   addUserColumn('last_seen_at', 'TEXT');
   addUserColumn('invited_by', 'TEXT');
+  // Multi-company: every account belongs to one company, and the platform
+  // owner — whoever runs this server — is flagged separately from the
+  // per-company administrator role.
+  addUserColumn('company_id', 'TEXT');
+  addUserColumn('platform_admin', 'INTEGER NOT NULL DEFAULT 0');
+
+  const addColumn = (table, name, ddl) => {
+    if (!columns(db, table).has(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${ddl}`);
+  };
+  addColumn('invitations', 'company_id', 'TEXT');
+  // NULL on a platform-level event (a company created or suspended).
+  addColumn('admin_events', 'company_id', 'TEXT');
+  // Denormalised from the owner so team templates and company-wide queries do
+  // not have to join through users for every row.
+  addColumn('documents', 'company_id', 'TEXT');
+  // A company's own logo, for its certificates, emails and sidebar. Pixel size
+  // is kept so layouts can be computed without decoding the image each time.
+  addColumn('companies', 'logo_path', 'TEXT');
+  addColumn('companies', 'logo_width', 'INTEGER');
+  addColumn('companies', 'logo_height', 'INTEGER');
+  addColumn('companies', 'logo_updated_at', 'TEXT');
 
   // Templates are documents with status 'template': they reuse the stored PDF,
   // the field table and the placer. Their recipients are roles ("Parent"),
@@ -48,6 +71,46 @@ export function migrate(db, nowIso) {
        VALUES (?, ?, 'Promoted to administrator', ?, 'Automatic: oldest account, no administrator existed', ?)`
     ).run(null, 'system', first.email, nowIso());
     console.log(`[migrate] ${first.email} promoted to administrator (no admin existed)`);
+  }
+
+  // A single-organisation installation becomes the first company. Its name is
+  // whatever the installation was called; its mail stays where it was, in
+  // app_settings, which is now the platform default every company falls back
+  // to — so nothing about how mail goes out changes on upgrade.
+  const companyCount = db.prepare('SELECT COUNT(*) AS n FROM companies').get().n;
+  if (companyCount === 0 && total > 0) {
+    const s = db.prepare('SELECT org_name FROM app_settings WHERE id = 1').get();
+    const named = db.prepare(`SELECT org_name FROM users WHERE org_name IS NOT NULL AND org_name != '' ORDER BY created_at LIMIT 1`).get();
+    const name = s?.org_name || named?.org_name || 'My organisation';
+    const id = crypto.randomUUID();
+    db.transaction(() => {
+      db.prepare(`INSERT INTO companies (id, name, status, created_at) VALUES (?, ?, 'active', ?)`).run(id, name, nowIso());
+      for (const table of ['users', 'documents', 'invitations', 'admin_events']) {
+        db.prepare(`UPDATE ${table} SET company_id = ? WHERE company_id IS NULL`).run(id);
+      }
+    })();
+    console.log(`[migrate] existing data moved into company "${name}"`);
+  }
+
+  // A document belongs to its owner's company.
+  db.prepare(
+    `UPDATE documents SET company_id = (SELECT company_id FROM users u WHERE u.id = documents.owner_id)
+     WHERE company_id IS NULL`
+  ).run();
+
+  // Someone has to be able to reach the platform pages. On an installation
+  // that predates them, that is the founding administrator.
+  const owners = db.prepare('SELECT COUNT(*) AS n FROM users WHERE platform_admin = 1').get().n;
+  if (owners === 0 && total > 0) {
+    const first = db.prepare(`SELECT id, email FROM users WHERE role = 'admin' ORDER BY created_at, rowid LIMIT 1`).get();
+    if (first) {
+      db.prepare('UPDATE users SET platform_admin = 1 WHERE id = ?').run(first.id);
+      db.prepare(
+        `INSERT INTO admin_events (actor_id, actor_email, action, subject, detail, created_at, company_id)
+         VALUES (NULL, 'system', 'Made platform owner', ?, 'Automatic: founding administrator, no platform owner existed', ?, NULL)`
+      ).run(first.email, nowIso());
+      console.log(`[migrate] ${first.email} is the platform owner`);
+    }
   }
 
   // Outgoing mail used to be configured per user. Carry the first configured

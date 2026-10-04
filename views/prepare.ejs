@@ -1,6 +1,7 @@
 <% const isTemplate = doc.status === 'template'; %>
 <%- include('partials/head', { title: (isTemplate ? 'Template · ' : 'Prepare · ') + doc.title, bodyClass: 'no-scroll' }) %>
 
+<%- include('partials/support-banner') %>
 <div class="placer" id="placer">
   <div class="placer-bar">
     <a class="brand brand-compact" href="<%= isTemplate ? '/templates' : '/documents' %>" title="<%= isTemplate ? 'Back to templates' : 'Back to documents' %>">

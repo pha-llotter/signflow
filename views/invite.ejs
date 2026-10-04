@@ -4,7 +4,13 @@
   <div class="auth card">
     <h1>Set up your account</h1>
     <p class="sub">
-      You have been invited as <%= invite.role === 'admin' ? 'an administrator' : 'a member' %>.
+      <% if (invite.role === 'platform') { %>
+        You have been invited to run <strong><%= brand.name %></strong> as a <strong>platform owner</strong>:
+        creating and managing the organisations that use it. Your account does not belong to any of them.
+      <% } else { %>
+        You have been invited to join <strong><%= typeof company !== 'undefined' && company ? company.name : 'your organisation' %></strong>
+        as <%= invite.role === 'admin' ? 'an administrator' : 'a member' %>.
+      <% } %>
     </p>
 
     <% if (error) { %><div class="notice notice-bad" style="margin-top:0"><%= error %></div><% } %>

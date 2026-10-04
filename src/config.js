@@ -55,3 +55,4 @@ export const config = {
 fs.mkdirSync(path.join(config.storageDir, 'originals'), { recursive: true });
 fs.mkdirSync(path.join(config.storageDir, 'sealed'), { recursive: true });
 fs.mkdirSync(path.join(config.storageDir, 'uploads'), { recursive: true });
+fs.mkdirSync(path.join(config.storageDir, 'logos'), { recursive: true });

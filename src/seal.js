@@ -575,7 +575,9 @@ async function appendAttachments(pdf, documentId) {
  */
 export async function sealDocument(documentId) {
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(documentId);
-  const owner = db.prepare('SELECT * FROM users WHERE id = ?').get(doc.owner_id);
+  const owner = db
+    .prepare('SELECT u.*, c.name AS org_name FROM users u LEFT JOIN companies c ON c.id = u.company_id WHERE u.id = ?')
+    .get(doc.owner_id);
   const recipients = db
     .prepare('SELECT * FROM recipients WHERE document_id = ? ORDER BY order_index')
     .all(documentId);

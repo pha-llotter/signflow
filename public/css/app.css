@@ -985,6 +985,61 @@ body.no-scroll { display: flex; flex-direction: column; }
   .tpl-actions .btn { flex: 1 1 auto; }
 }
 
+/* ------------------------------------------------------------- platform ---- */
+
+/* The platform owner's link sits apart from the company's own navigation. */
+.side-nav.side-platform { flex: none; padding-top: 10px; border-top: 1px solid var(--border); }
+
+/* A company's own logo, beside its name and on its settings pages. */
+.side-org-logo { width: 26px; height: 26px; object-fit: contain; flex: none; border-radius: 4px; }
+.logo-preview {
+  display: flex; align-items: center; gap: 14px; margin-top: 14px; padding: 14px;
+  /* Paper, not the themed surface: the logo is shown as it will print. */
+  background: var(--paper); border: 1px solid var(--border); border-radius: var(--r);
+}
+.logo-preview img { max-height: 56px; max-width: 220px; width: auto; height: auto; display: block; }
+.logo-preview .hint { margin: 0; color: var(--paper-muted); }
+/* A file picker has a wide intrinsic size, so the row wraps rather than overflowing a phone. */
+.logo-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+.logo-form input[type=file] { flex: 1 1 220px; min-width: 0; max-width: 100%; }
+
+/* Platform support: impossible to miss, on every page, in both themes. */
+.support-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex: none;
+  padding: 9px 20px; background: var(--vio); color: var(--surface);
+  font-size: 13.5px;
+}
+.support-bar strong { font-weight: 700; }
+.support-tag {
+  font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px; background: var(--surface); color: var(--vio);
+}
+.support-text { flex: 1; min-width: 0; }
+.support-bar form { margin: 0; }
+.support-bar .support-exit { background: var(--surface); color: var(--vio); border-color: var(--surface); }
+.support-bar .support-exit:hover { background: var(--vio-bg); color: var(--vio); }
+@media (max-width: 620px) {
+  /* The top bar carries its own Exit button, so the banner can give its whole
+     width to saying who you are signed in as. */
+  .support-bar { padding: 9px 14px; gap: 6px; }
+  .support-bar form { display: none; }
+  .support-text { flex-basis: 100%; }
+  .dash-actions { width: 100%; }
+}
+
+/* The banner scrolls away with the page; this stays in the sticky top bar. */
+.top-support { margin: 0; }
+.top-support .btn { background: var(--vio); border-color: var(--vio); color: var(--surface); }
+.top-support .btn:hover { background: var(--vio); filter: brightness(1.1); }
+
+/* An irreversible action is set apart from the reversible ones above it. */
+.danger-card { border-color: var(--bad-line); }
+.danger-card h2 { color: var(--bad); }
+
+/* A company's own SMTP fields only matter once it chooses its own server. */
+.own-mail { display: none; }
+.card:has(input[name=mail_source][value=own]:checked) .own-mail { display: block; }
+
 /* --------------------------------------------------------------- footer ---- */
 
 .app-main .siteftr .wrap { max-width: 1320px; }

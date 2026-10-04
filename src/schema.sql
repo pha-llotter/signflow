@@ -164,3 +164,25 @@ CREATE TABLE IF NOT EXISTS audit_events (
   created_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_doc ON audit_events(document_id, id);
+
+-- One row per organisation using the platform. Everything a company owns —
+-- people, documents, invitations, its administration log — carries its id.
+-- The mail columns are an optional override: when smtp_host is empty the
+-- company sends through the platform default held in app_settings.
+CREATE TABLE IF NOT EXISTS companies (
+  id             TEXT PRIMARY KEY,
+  name           TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'active',
+  created_at     TEXT NOT NULL,
+  created_by     TEXT,
+  suspended_at   TEXT,
+  smtp_host      TEXT,
+  smtp_port      INTEGER,
+  smtp_secure    INTEGER DEFAULT 0,
+  smtp_user      TEXT,
+  smtp_pass_enc  TEXT,
+  from_name      TEXT,
+  from_email     TEXT,
+  updated_at     TEXT,
+  updated_by     TEXT
+);

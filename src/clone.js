@@ -34,12 +34,13 @@ export function cloneDocument(source, {
     db.prepare(
       `INSERT INTO documents (id, owner_id, title, message, filename, page_count, page_sizes,
          original_path, original_sha256, status, signing_order, expires_at, created_at,
-         template_visibility, template_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         template_visibility, template_id, company_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+         (SELECT company_id FROM users WHERE id = ?))`
     ).run(
       id, ownerId, title, message, source.filename, source.page_count, source.page_sizes,
       storedPath, source.original_sha256, status, signingOrder ? 1 : 0, expiresAt, nowIso(),
-      visibility, templateId
+      visibility, templateId, ownerId
     );
 
     const newIds = new Map();

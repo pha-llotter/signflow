@@ -1,0 +1,30 @@
+<%- include('partials/head', { title: 'Platform mail' }) %>
+<%- include('partials/shell-start') %>
+
+  <div class="wrap" style="max-width:720px">
+    <p class="hint" style="margin:0 0 6px"><a href="/platform">← Platform</a></p>
+    <div class="page-head">
+      <div>
+        <h1>Platform mail</h1>
+        <p class="sub">The default every company sends through, unless its administrator connects its own mail server.</p>
+      </div>
+    </div>
+
+    <% if (saved) { %><div class="notice notice-ok" style="margin-top:0;margin-bottom:18px">Saved.</div><% } %>
+    <% if (test) { %><div class="notice notice-ok" style="margin-top:0;margin-bottom:18px"><%= test %></div><% } %>
+    <% if (error) { %><div class="notice notice-bad" style="margin-top:0;margin-bottom:18px"><%= error %></div><% } %>
+
+    <form method="post" action="/platform/mail">
+      <div class="card">
+        <h2>Outgoing mail</h2>
+        <p class="hint">Leave the host empty to turn platform mail off; companies without their own server then cannot email anything.</p>
+        <%- include('partials/smtp-fields', { s: s }) %>
+      </div>
+      <div class="btn-row" style="margin-top:18px">
+        <button class="btn" type="submit">Save</button>
+        <button class="btn btn-ghost" type="submit" formaction="/platform/mail/test" formnovalidate <%= s.smtp_host ? '' : 'disabled' %>>Send a test email</button>
+      </div>
+    </form>
+  </div>
+
+<%- include('partials/shell-end') %>

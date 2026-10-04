@@ -1,0 +1,199 @@
+<%- include('partials/head', { title: c.name + ' · Platform' }) %>
+<%- include('partials/shell-start') %>
+<%
+  const n = function (v) { return v || 0; };
+  const totalDocs = n(counts.draft) + n(counts.sent) + n(counts.completed) + n(counts.declined);
+%>
+  <div class="wrap">
+    <p class="hint" style="margin:0 0 6px"><a href="/platform">← All companies</a></p>
+    <div class="page-head">
+      <div>
+        <h1><%= c.name %></h1>
+        <p class="sub">
+          <span class="pill <%= c.status === 'active' ? 'pill-completed' : 'pill-declined' %>"><%= c.status %></span>
+          · created <%= new Date(c.created_at).toLocaleDateString() %>
+          <% if (c.suspended_at) { %>· suspended <%= new Date(c.suspended_at).toLocaleDateString() %><% } %>
+          · mail: <%= mailSource === 'own' ? 'own server (' + c.smtp_host + ')' : mailSource === 'platform' ? brand.name + ' mail' : 'not set up' %>
+        </p>
+      </div>
+    </div>
+
+    <section class="stats" aria-label="Usage">
+      <div class="stat card"><div class="stat-label">People</div>
+        <div class="stat-value"><%= users.filter(function (u) { return u.status === 'active'; }).length %></div>
+        <div class="stat-note"><%= invites.length %> invitation<%= invites.length === 1 ? '' : 's' %> outstanding</div></div>
+      <div class="stat card"><div class="stat-label">Documents</div>
+        <div class="stat-value"><%= totalDocs %></div>
+        <div class="stat-note"><%= n(counts.completed) %> completed · <%= n(counts.sent) %> out</div></div>
+      <div class="stat card"><div class="stat-label">Declined</div>
+        <div class="stat-value"><%= n(counts.declined) %></div>
+        <div class="stat-note"><%= n(counts.draft) %> draft<%= n(counts.draft) === 1 ? '' : 's' %></div></div>
+      <div class="stat card"><div class="stat-label">Templates</div>
+        <div class="stat-value"><%= n(counts.templates) %></div>
+        <div class="stat-note">counts only — content stays private</div></div>
+    </section>
+
+    <div class="card">
+      <h2>People</h2>
+      <p class="hint">Shown for support. People are managed by the company's own administrators.</p>
+      <% if (!users.length) { %>
+        <p class="hint">Nobody has joined yet.</p>
+      <% } else { %>
+        <table style="margin-top:10px">
+          <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Documents</th><th>Last seen</th></tr></thead>
+          <tbody>
+            <% users.forEach(function (u) { %>
+              <tr>
+                <td class="td-primary"><strong><%= u.display_name %></strong><% if (u.platform_admin) { %> <span class="role-tag">Platform</span><% } %><div class="hint"><%= u.email %></div></td>
+                <td data-label="Role"><span class="pill <%= u.role === 'admin' ? 'pill-sent' : 'pill-draft' %>"><%= u.role %></span></td>
+                <td data-label="Status"><span class="pill <%= u.status === 'active' ? 'pill-completed' : 'pill-declined' %>"><%= u.status %></span></td>
+                <td data-label="Documents"><%= u.document_count %></td>
+                <td data-label="Last seen" class="hint"><%= u.last_seen_at ? new Date(u.last_seen_at).toLocaleDateString() : 'never' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+    <% const supportable = users.filter(function (u) { return u.status === 'active' && !u.platform_admin; }); %>
+    <div class="card">
+      <h2>Sign in as someone for support</h2>
+      <p class="hint">
+        See and do exactly what they can, for up to <%= supportMinutes %> minutes. The start, the end and your reason go into
+        <%= c.name %>'s own administration log, and anything you do is recorded as you acting on their behalf —
+        including in document audit trails and certificates.
+      </p>
+      <% if (c.status !== 'active') { %>
+        <p class="hint" style="margin-top:10px">Reactivate the company to enter it.</p>
+      <% } else if (!supportable.length) { %>
+        <p class="hint" style="margin-top:10px">Nobody here can be signed in as yet.</p>
+      <% } else { %>
+        <form method="post" action="/platform/companies/<%= c.id %>/support" class="grid-2" style="margin-top:14px;align-items:end">
+          <div class="field" style="margin-bottom:0">
+            <label for="support-user">Sign in as</label>
+            <select id="support-user" name="user_id" required>
+              <% supportable.forEach(function (u) { %>
+                <option value="<%= u.id %>"><%= u.display_name %> — <%= u.email %> (<%= u.role %>)</option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label for="support-reason">Reason <span style="font-weight:400;color:var(--text-3)">(they will see this)</span></label>
+            <input id="support-reason" name="reason" type="text" required maxlength="300" placeholder="e.g. Ticket 1042 — template fields not saving">
+          </div>
+          <div><button class="btn" type="submit">Start support session</button></div>
+        </form>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <h2>Invite an administrator</h2>
+      <p class="hint">For a new company whose first invitation lapsed, or one that has lost its administrators. They join as an administrator of <%= c.name %>.</p>
+      <form method="post" action="/platform/companies/<%= c.id %>/invite" class="role-row" style="margin-top:14px">
+        <input name="email" type="email" required placeholder="name@example.com" aria-label="Email address">
+        <button class="btn btn-sm" type="submit">Send invitation</button>
+      </form>
+      <% if (invites.length) { %>
+        <table style="margin-top:12px">
+          <thead><tr><th>Outstanding</th><th>Role</th><th>Expires</th><th>Link</th></tr></thead>
+          <tbody>
+            <% invites.forEach(function (i) { %>
+              <tr>
+                <td class="td-primary"><strong><%= i.email %></strong></td>
+                <td data-label="Role"><%= i.role %></td>
+                <td data-label="Expires" class="hint"><%= new Date(i.expires_at).toLocaleDateString() %></td>
+                <td data-label="Link"><button class="link-btn copy-link" type="button" data-link="<%= baseUrl %>/invite/<%= i.token %>">Copy link</button></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+    <%- include('partials/logo-card', { c: c, base: '/platform/companies/' + c.id }) %>
+
+    <div class="card">
+      <h2>Name</h2>
+      <form method="post" action="/platform/companies/<%= c.id %>/rename" class="role-row" style="margin-top:12px">
+        <input name="name" type="text" value="<%= c.name %>" required aria-label="Company name">
+        <button class="btn btn-ghost btn-sm" type="submit">Rename</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Administration log</h2>
+      <p class="hint">The company's own record of who was invited, promoted or deactivated, and settings changes.</p>
+      <% if (!events.length) { %>
+        <p class="hint">Nothing yet.</p>
+      <% } else { %>
+        <ul class="audit" style="margin-top:14px">
+          <% events.forEach(function (e) { %>
+            <li>
+              <time><%= new Date(e.created_at).toLocaleString() %></time>
+              <div>
+                <span class="who"><%= e.actor_email %></span> — <%= e.action %><% if (e.subject) { %>: <%= e.subject %><% } %>
+                <% if (e.detail) { %><span class="det"><%= e.detail %></span><% } %>
+              </div>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <h2><%= c.status === 'active' ? 'Suspend' : 'Reactivate' %></h2>
+      <% if (c.status === 'active') { %>
+        <p class="hint">Signs everyone at <%= c.name %> out and stops them signing in. Nothing is deleted, and signing links already sent keep working so their recipients are not left stranded.</p>
+        <form method="post" action="/platform/companies/<%= c.id %>/status" style="margin-top:12px"
+              onsubmit="return confirm('Suspend <%= c.name.replace(/'/g, '') %>? Everyone there will be signed out.')">
+          <input type="hidden" name="status" value="suspended">
+          <button class="btn btn-danger btn-sm" type="submit">Suspend company</button>
+        </form>
+      <% } else { %>
+        <p class="hint">Lets everyone at <%= c.name %> sign in again, exactly as before.</p>
+        <form method="post" action="/platform/companies/<%= c.id %>/status" style="margin-top:12px">
+          <input type="hidden" name="status" value="active">
+          <button class="btn btn-sm" type="submit">Reactivate company</button>
+        </form>
+      <% } %>
+    </div>
+
+    <div class="card danger-card">
+      <h2>Delete company</h2>
+      <% if (footprint.owners) { %>
+        <p class="hint">This company holds a platform owner's account, so it cannot be deleted.</p>
+      <% } else { %>
+        <p class="hint">
+          Permanently removes <%= c.name %> and everything it holds:
+          <strong><%= footprint.users %> account<%= footprint.users === 1 ? '' : 's' %></strong>,
+          <strong><%= footprint.documents %> document<%= footprint.documents === 1 ? '' : 's' %></strong> with their audit trails and stored PDFs,
+          <strong><%= footprint.templates %> template<%= footprint.templates === 1 ? '' : 's' %></strong>,
+          and its invitations and administration log. Signing links stop working, and documents it already sealed
+          can no longer be checked on the Verify page. <strong>This cannot be undone.</strong>
+        </p>
+        <% if (c.status !== 'suspended') { %>
+          <p class="hint" style="margin-top:10px">Suspend the company first — that signs its people out before anything is removed.</p>
+        <% } else { %>
+          <form method="post" action="/platform/companies/<%= c.id %>/delete" class="role-row" style="margin-top:14px">
+            <input name="confirm_name" type="text" required autocomplete="off"
+                   placeholder="Type “<%= c.name %>” to confirm" aria-label="Type the company name to confirm">
+            <button class="btn btn-danger btn-sm" type="submit">Delete permanently</button>
+          </form>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+
+<script>
+  document.querySelectorAll('.copy-link').forEach((b) => {
+    b.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(b.dataset.link);
+      const was = b.textContent;
+      b.textContent = 'Copied';
+      setTimeout(() => { b.textContent = was; }, 1400);
+    });
+  });
+</script>
+
+<%- include('partials/shell-end') %>

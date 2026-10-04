@@ -14,7 +14,8 @@
     "email-preview": "node scripts/email-preview.js",
     "rotation-check": "node scripts/rotation-check.js",
     "admin-check": "node scripts/admin-check.js",
-    "mobile-check": "node scripts/mobile-placer-check.js"
+    "mobile-check": "node scripts/mobile-placer-check.js",
+    "tenant-check": "node scripts/tenant-check.js"
   },
   "keywords": [],
   "author": "",

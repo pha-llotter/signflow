@@ -4,8 +4,8 @@
   <div class="wrap" style="max-width:720px">
     <div class="page-head">
       <div>
-        <h1>Installation settings</h1>
-        <p class="sub">These apply to everyone on this installation, not just your account.</p>
+        <h1>Settings</h1>
+        <p class="sub">These apply to everyone in <%= settings.name %>, not just your account.</p>
       </div>
     </div>
 
@@ -17,75 +17,46 @@
       <div class="card">
         <h2>Organisation</h2>
         <div class="field" style="margin:14px 0 0">
-          <label for="org_name">Name</label>
-          <input id="org_name" name="org_name" type="text" value="<%= settings.org_name || '' %>"
-                 placeholder="Protea Heights Academy">
-          <p class="hint">Appears on invitations and in the footer of emails.</p>
+          <label for="name">Name</label>
+          <input id="name" name="name" type="text" value="<%= settings.name %>" required>
+          <p class="hint">Shown to your team, on invitations, and to signers alongside the sender's name.</p>
         </div>
       </div>
 
       <div class="card">
         <h2>Outgoing mail</h2>
-        <p class="hint">
-          One mail server for the whole installation. Every signing invitation, reminder, completion notice and
-          team invitation goes out through it. Members cannot change this, which is why it lives here rather
-          than on each account.
-        </p>
-
-        <div class="grid-2" style="margin-top:16px">
-          <div class="field">
-            <label for="smtp_host">SMTP host</label>
-            <input id="smtp_host" name="smtp_host" type="text" value="<%= settings.smtp_host || '' %>" placeholder="smtp.office365.com">
-          </div>
-          <div class="field">
-            <label for="smtp_port">Port</label>
-            <input id="smtp_port" name="smtp_port" type="number" value="<%= settings.smtp_port || 587 %>">
-          </div>
-          <div class="field">
-            <label for="smtp_user">Username</label>
-            <input id="smtp_user" name="smtp_user" type="text" value="<%= settings.smtp_user || '' %>" autocomplete="off">
-          </div>
-          <div class="field">
-            <label for="smtp_pass">Password</label>
-            <input id="smtp_pass" name="smtp_pass" type="password"
-                   placeholder="<%= settings.smtp_pass_enc ? '•••••••• (leave blank to keep)' : '' %>" autocomplete="new-password">
-          </div>
-          <div class="field">
-            <label for="from_name">Default from name</label>
-            <input id="from_name" name="from_name" type="text" value="<%= settings.from_name || '' %>" placeholder="<%= brand.name %>">
-            <p class="hint">Used only when the sender has no name set.</p>
-          </div>
-          <div class="field">
-            <label for="from_email">From address</label>
-            <input id="from_email" name="from_email" type="email" value="<%= settings.from_email || '' %>" placeholder="noreply@phahs.org.za">
-            <p class="hint">Must be an address this server is allowed to send as.</p>
-          </div>
+        <p class="hint">Every signing invitation, reminder, completion notice and team invitation from your organisation goes out through this.</p>
+        <div class="choice-cards" style="margin-top:12px">
+          <label class="choice">
+            <input type="radio" name="mail_source" value="platform" <%= !settings.smtp_host ? 'checked' : '' %>>
+            <span><strong>Use <%= brand.name %> mail</strong><small>
+              <% if (platformMail) { %>Sent through the platform's mail account. Nothing to set up.
+              <% } else { %>The platform mail account has not been set up yet, so links are not emailed until it is.<% } %>
+            </small></span>
+          </label>
+          <label class="choice">
+            <input type="radio" name="mail_source" value="own" <%= settings.smtp_host ? 'checked' : '' %>>
+            <span><strong>Use our own mail server</strong><small>Mail comes from your own domain, e.g. noreply@yourschool.co.za.</small></span>
+          </label>
         </div>
-
-        <label class="check">
-          <input type="checkbox" name="smtp_secure" value="1" <%= settings.smtp_secure ? 'checked' : '' %>>
-          <span>Use TLS from the first byte (port 465). Leave off for STARTTLS on 587.</span>
-        </label>
-
-        <div class="notice" style="background:var(--surface-2);border-color:var(--border);color:var(--text-2);margin-top:16px">
-          <strong style="display:block;margin-bottom:5px;color:var(--text)">How a recipient sees it</strong>
-          Mail is sent from the one address above, because most servers reject a From they do not own. The
-          <em>display name</em> is whoever sent the document, and <strong>Reply-To is set to their own address</strong>,
-          so a recipient sees a name they recognise and replies reach the right person.
+        <div class="own-mail">
+          <%- include('partials/smtp-fields', { s: settings }) %>
         </div>
-
-        <p class="hint" style="margin-top:14px">
-          The password is encrypted at rest with AES-256-GCM. It has to be recoverable to authenticate to your
-          mail server, so it is encrypted rather than hashed — unlike account passwords, which are hashed with
-          Argon2id and can never be read back.
-        </p>
       </div>
 
       <div class="btn-row" style="margin-top:18px">
         <button class="btn" type="submit">Save settings</button>
-        <button class="btn btn-ghost" type="submit" formaction="/settings/test" formnovalidate>Send a test email</button>
+        <button class="btn btn-ghost" type="submit" formaction="/settings/test" formnovalidate <%= effective ? '' : 'disabled' %>>Send a test email</button>
       </div>
+      <p class="hint">
+        <% if (!effective) { %>No mail account is in effect yet.
+        <% } else if (effective.source === 'company') { %>In effect: your own server, <%= effective.smtp_host %>.
+        <% } else { %>In effect: <%= brand.name %> mail.<% } %>
+        The test goes to your own address using the saved settings.
+      </p>
     </form>
+
+    <%- include('partials/logo-card', { c: settings, base: '/settings' }) %>
 
     <% if (settings.updated_at) { %>
       <p class="hint" style="margin-top:16px">
@@ -95,7 +66,7 @@
     <% } %>
 
     <div class="card">
-      <h2>This installation</h2>
+      <h2>This build</h2>
       <p class="hint">
         Quote the build when reporting a problem. It is also printed on every certificate of completion, so a
         sealed document can be traced back to the exact code that produced it.

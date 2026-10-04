@@ -45,7 +45,8 @@ $suites = @(
   @{ name = 'admin-check';  script = 'scripts/admin-check.js';          args = @() },
   @{ name = 'rotation';     script = 'scripts/rotation-check.js';       args = @("$env:TEMP\release-rot") },
   @{ name = 'ui-check';     script = 'scripts/ui-check.js';             args = @("$env:TEMP\release-ui") },
-  @{ name = 'mobile-check'; script = 'scripts/mobile-placer-check.js';  args = @("$env:TEMP\release-mob") }
+  @{ name = 'mobile-check'; script = 'scripts/mobile-placer-check.js';  args = @("$env:TEMP\release-mob") },
+  @{ name = 'tenant-check'; script = 'scripts/tenant-check.js';         args = @() }
 )
 
 if (-not $SkipTests) {

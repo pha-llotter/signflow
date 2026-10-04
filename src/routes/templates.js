@@ -6,7 +6,7 @@ import { PDFDocument } from 'pdf-lib';
 
 import { config } from '../config.js';
 import { db, nowIso, audit } from '../db.js';
-import { requireAuth, ownedDocument, usableTemplate } from '../middleware/auth.js';
+import { requireAuth, ownedDocument, usableTemplate, canManageTemplate } from '../middleware/auth.js';
 import { sha256Buffer, uuid } from '../crypto.js';
 import { cloneDocument } from '../clone.js';
 import { sendDocument } from './documents.js';
@@ -62,10 +62,11 @@ router.get('/templates', requireAuth, (req, res) => {
               (SELECT COUNT(*) FROM fields f WHERE f.document_id = d.id) AS field_count,
               (SELECT COUNT(*) FROM documents x WHERE x.template_id = d.id) AS uses
        FROM documents d JOIN users u ON u.id = d.owner_id
-       WHERE d.status = 'template' AND (d.owner_id = ? OR d.template_visibility = 'team')
+       WHERE d.status = 'template'
+         AND (d.owner_id = ? OR (d.template_visibility = 'team' AND d.company_id = ?))
        ORDER BY d.title COLLATE NOCASE`
     )
-    .all(req.user.id);
+    .all(req.user.id, req.user.company_id);
 
   const show = ['team', 'private'].includes(req.query.show) ? req.query.show : null;
   const templates = all
@@ -73,7 +74,7 @@ router.get('/templates', requireAuth, (req, res) => {
     .map((t) => ({
       ...t,
       mine: t.owner_id === req.user.id,
-      canManage: t.owner_id === req.user.id || (t.template_visibility === 'team' && req.user.role === 'admin'),
+      canManage: canManageTemplate(req.user, t),
     }));
   const counts = {
     all: all.length,
@@ -125,12 +126,12 @@ router.post('/templates/new', requireAuth, (req, res, next) => {
       db.transaction(() => {
         db.prepare(
           `INSERT INTO documents (id, owner_id, title, message, filename, page_count, page_sizes,
-             original_path, original_sha256, status, signing_order, created_at, template_visibility)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'template', ?, ?, ?)`
+             original_path, original_sha256, status, signing_order, created_at, template_visibility, company_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'template', ?, ?, ?, ?)`
         ).run(
           id, req.user.id, values.title || req.file.originalname.replace(/\.pdf$/i, ''), values.message,
           req.file.originalname, pageSizes.length, JSON.stringify(pageSizes), storedPath,
-          sha256Buffer(req.file.buffer), values.signingOrder, nowIso(), values.visibility
+          sha256Buffer(req.file.buffer), values.signingOrder, nowIso(), values.visibility, req.user.company_id
         );
         const insert = db.prepare(
           `INSERT INTO recipients (id, document_id, name, email, order_index) VALUES (?, ?, ?, '', ?)`

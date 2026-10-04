@@ -1,27 +1,31 @@
 import { Router } from 'express';
 import { db, nowIso, adminLog } from '../db.js';
 import { hashPassword, verifyPassword, uuid } from '../crypto.js';
+import { endSupport } from '../support.js';
 
 const router = Router();
 
 const userCount = () => db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
 
 /**
- * Public sign-up exists only to create the very first account, which becomes
- * the administrator. After that the installation is invitation-only — an
- * open registration form on a document-signing tool lets anyone give
- * themselves a seat.
+ * Public sign-up exists only to create the very first account on a new
+ * server: it founds the first company, administers it, and owns the platform.
+ * After that everything is by invitation — new companies are created from the
+ * platform pages — because an open registration form on a document-signing
+ * tool lets anyone give themselves a seat.
  */
 const firstRunOnly = (req, res, next) => {
   if (userCount() > 0) {
     req.session.flash = {
       type: 'error',
-      text: 'This installation is invitation-only. Ask an administrator to invite you.',
+      text: 'Accounts are by invitation only. Ask your administrator to invite you.',
     };
     return res.redirect('/login');
   }
   next();
 };
+
+const SUSPENDED = 'Access for your organisation has been suspended. Contact the platform administrator.';
 
 router.get('/register', firstRunOnly, (req, res) => {
   if (req.user) return res.redirect('/dashboard');
@@ -41,21 +45,24 @@ router.post('/register', firstRunOnly, async (req, res) => {
   if (password.length < 10) return fail('Use a password of at least 10 characters.');
 
   const id = uuid();
-  db.prepare(
-    `INSERT INTO users (id, email, password_hash, display_name, org_name, role, status, created_at)
-     VALUES (?, ?, ?, ?, ?, 'admin', 'active', ?)`
-  ).run(id, email, await hashPassword(password), name, org || null, nowIso());
-
-  // The organisation name given here seeds the installation-wide record, so it
-  // appears on emails and the team page without a second trip to Settings.
-  if (org) db.prepare('UPDATE app_settings SET org_name = ? WHERE id = 1').run(org);
+  const companyId = uuid();
+  const hash = await hashPassword(password);
+  db.transaction(() => {
+    db.prepare(`INSERT INTO companies (id, name, status, created_at, created_by) VALUES (?, ?, 'active', ?, ?)`)
+      .run(companyId, org || 'My organisation', nowIso(), id);
+    db.prepare(
+      `INSERT INTO users (id, email, password_hash, display_name, org_name, role, status, created_at, company_id, platform_admin)
+       VALUES (?, ?, ?, ?, ?, 'admin', 'active', ?, ?, 1)`
+    ).run(id, email, hash, name, org || null, nowIso(), companyId);
+  })();
 
   adminLog({
     actor: { id, email },
-    action: 'Installation created',
+    action: 'Platform created',
     subject: email,
-    detail: 'First account — administrator',
+    detail: `First account — platform owner and administrator of ${org || 'My organisation'}`,
     req,
+    companyId: null,
   });
 
   req.session.regenerate(() => {
@@ -68,9 +75,11 @@ router.get('/login', (req, res) => {
   if (req.user) return res.redirect('/dashboard');
   res.render('login', {
     email: '',
-    error: req.query.deactivated
-      ? 'Your account has been deactivated. Ask an administrator to restore it.'
-      : null,
+    error: req.query.suspended
+      ? SUSPENDED
+      : req.query.deactivated
+        ? 'Your account has been deactivated. Ask an administrator to restore it.'
+        : null,
     firstRun: userCount() === 0,
   });
 });
@@ -95,6 +104,8 @@ router.post('/login', async (req, res) => {
   if (user.status !== 'active') {
     return reject('That account has been deactivated. Ask an administrator to restore it.');
   }
+  const company = db.prepare('SELECT status FROM companies WHERE id = ?').get(user.company_id);
+  if (company?.status === 'suspended' && !user.platform_admin) return reject(SUSPENDED);
 
   req.session.regenerate((err) => {
     if (err) return reject('Could not start a session.');
@@ -105,7 +116,25 @@ router.post('/login', async (req, res) => {
   });
 });
 
+/**
+ * Leaving a support session returns the platform owner to their own account
+ * and to the company they were helping. Signing out during one does the same:
+ * the person being helped is not the one at the keyboard, so there is nobody
+ * to sign out but the session.
+ */
+function leaveSupport(req, res) {
+  const companyId = endSupport(req);
+  req.session.flash = { type: 'ok', text: 'Support session ended. You are back in your own account.' };
+  res.redirect(companyId ? `/platform/companies/${companyId}` : '/platform');
+}
+
+router.post('/support/exit', (req, res) => {
+  if (!req.session?.impersonator) return res.redirect('/dashboard');
+  leaveSupport(req, res);
+});
+
 router.post('/logout', (req, res) => {
+  if (req.session?.impersonator) return leaveSupport(req, res);
   req.session.destroy(() => res.redirect('/login'));
 });
 
@@ -122,13 +151,21 @@ function loadInvite(req, res, next) {
   if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(invite.email)) {
     return dead('An account already exists for that address. Try signing in instead.');
   }
+  // A platform-owner invitation belongs to no company; every other one must
+  // still point at a company that exists and is switched on.
+  if (invite.role !== 'platform') {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(invite.company_id);
+    if (!company) return dead('This invitation is no longer valid.');
+    if (company.status === 'suspended') return dead(SUSPENDED);
+    req.company = company;
+  }
 
   req.invite = invite;
   next();
 }
 
 router.get('/invite/:token', loadInvite, (req, res) => {
-  res.render('invite', { invite: req.invite, token: req.params.token, error: null, values: {} });
+  res.render('invite', { invite: req.invite, company: req.company, token: req.params.token, error: null, values: {} });
 });
 
 router.post('/invite/:token', loadInvite, async (req, res) => {
@@ -138,7 +175,7 @@ router.post('/invite/:token', loadInvite, async (req, res) => {
 
   const fail = (error) =>
     res.status(400).render('invite', {
-      invite: req.invite, token: req.params.token, error, values: { display_name: name },
+      invite: req.invite, company: req.company, token: req.params.token, error, values: { display_name: name },
     });
 
   if (name.length < 2) return fail('Enter your name.');
@@ -147,12 +184,14 @@ router.post('/invite/:token', loadInvite, async (req, res) => {
 
   const id = uuid();
   const hash = await hashPassword(password);
+  const platform = req.invite.role === 'platform';
 
   db.transaction(() => {
     db.prepare(
-      `INSERT INTO users (id, email, password_hash, display_name, role, status, created_at, invited_by)
-       VALUES (?, ?, ?, ?, ?, 'active', ?, ?)`
-    ).run(id, req.invite.email, hash, name, req.invite.role, nowIso(), req.invite.invited_by);
+      `INSERT INTO users (id, email, password_hash, display_name, role, status, created_at, invited_by, company_id)
+       VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)`
+    ).run(id, req.invite.email, hash, name, platform ? 'member' : req.invite.role, nowIso(), req.invite.invited_by, platform ? null : req.invite.company_id);
+    if (platform) db.prepare('UPDATE users SET platform_admin = 1 WHERE id = ?').run(id);
     db.prepare('UPDATE invitations SET accepted_at = ? WHERE id = ?').run(nowIso(), req.invite.id);
   })();
 
@@ -160,13 +199,14 @@ router.post('/invite/:token', loadInvite, async (req, res) => {
     actor: { id, email: req.invite.email },
     action: 'Invitation accepted',
     subject: req.invite.email,
-    detail: `Joined as ${req.invite.role}`,
+    detail: platform ? 'Joined as a platform owner' : `Joined as ${req.invite.role}`,
     req,
+    companyId: req.invite.company_id,
   });
 
   req.session.regenerate(() => {
     req.session.userId = id;
-    res.redirect('/dashboard');
+    res.redirect(platform ? '/platform' : '/dashboard');
   });
 });
 
@@ -210,7 +250,7 @@ router.post('/reset/:token', loadReset, async (req, res) => {
   })();
 
   adminLog({
-    actor: { id: req.resetUser.id, email: req.resetUser.email },
+    actor: { id: req.resetUser.id, email: req.resetUser.email, company_id: req.resetUser.company_id },
     action: 'Password changed',
     subject: req.resetUser.email,
     detail: 'Via reset link',

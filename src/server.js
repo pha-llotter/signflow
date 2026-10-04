@@ -16,9 +16,9 @@ import teamRoutes from './routes/team.js';
 import profileRoutes from './routes/profile.js';
 import dashboardRoutes from './routes/dashboard.js';
 import templateRoutes from './routes/templates.js';
+import platformRoutes from './routes/platform.js';
 import { currentUser } from './middleware/auth.js';
 import { version } from './version.js';
-import { appSettings } from './settings-store.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -82,7 +82,7 @@ app.use((req, res, next) => {
   res.locals.path = req.path;
   res.locals.query = req.query;
   // The sidebar names the organisation; only signed-in pages draw it.
-  res.locals.orgName = req.user ? appSettings()?.org_name || null : null;
+  res.locals.orgName = req.company?.name || null;
   // The dropzone rejects oversized files before uploading them, so it needs the
   // same limit multer enforces — derived from it rather than restated.
   res.locals.maxUploadMb = Math.round(config.maxUploadBytes / 1024 / 1024);
@@ -97,6 +97,7 @@ app.use('/', teamRoutes);
 app.use('/', profileRoutes);
 app.use('/', dashboardRoutes);
 app.use('/', templateRoutes);
+app.use('/', platformRoutes);
 app.use('/', documentRoutes);
 app.use('/', prepareRoutes);
 app.use('/', signRoutes);

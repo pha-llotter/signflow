@@ -2,10 +2,10 @@
 <%- include('partials/pub-start') %>
 
   <div class="auth card">
-    <h1>Create the administrator</h1>
+    <h1>Set up <%= brand.name %></h1>
     <p class="sub">
-      This is the first account on this installation. It becomes the administrator, and everyone
-      after it joins by invitation.
+      This is the first account on this server. It creates your organisation, administers it, and owns the
+      platform — further organisations are added from the Platform page, and everyone else joins by invitation.
     </p>
 
     <% if (error) { %><div class="notice notice-bad" style="margin-top:0"><%= error %></div><% } %>
@@ -16,7 +16,7 @@
         <input id="display_name" name="display_name" type="text" value="<%= values.display_name || '' %>" required autofocus>
       </div>
       <div class="field">
-        <label for="org_name">Organisation <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
+        <label for="org_name">Organisation</label>
         <input id="org_name" name="org_name" type="text" value="<%= values.org_name || '' %>">
       </div>
       <div class="field">

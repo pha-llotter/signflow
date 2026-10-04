@@ -36,7 +36,10 @@ function publicView(doc) {
   const events = db
     .prepare('SELECT actor, action, detail, ip, created_at FROM audit_events WHERE document_id = ? ORDER BY id')
     .all(doc.id);
-  const owner = db.prepare('SELECT display_name, email, org_name FROM users WHERE id = ?').get(doc.owner_id);
+  // The organisation shown is the company the document was sent from.
+  const owner = db
+    .prepare('SELECT u.display_name, u.email, c.name AS org_name FROM users u LEFT JOIN companies c ON c.id = u.company_id WHERE u.id = ?')
+    .get(doc.owner_id);
   return { doc, recipients, events, owner };
 }
 

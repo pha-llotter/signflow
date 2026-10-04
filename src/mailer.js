@@ -2,20 +2,21 @@ import nodemailer from 'nodemailer';
 import { decryptSecret } from './crypto.js';
 import { config } from './config.js';
 import { mailLogoAttachment } from './brand.js';
-import { appSettings } from './settings-store.js';
+import { mailSettings, companyById } from './settings-store.js';
+import { companyLogo, fitLogo } from './company-logo.js';
 import { renderEmail, renderText, esc } from './email-template.js';
 
 /**
- * Outgoing mail is configured once for the whole installation, by an admin.
- * Members cannot reach Settings, so per-user credentials would leave their
- * invitations silently unable to send.
+ * Outgoing mail is chosen per company: its own server if an administrator set
+ * one, otherwise the platform default. Members cannot reach Settings, so
+ * per-user credentials would leave their invitations silently unable to send.
  *
- * Returns null when mail has not been configured yet — callers fall back to
- * logging the link so the flow still works before SMTP is set up.
+ * Returns null when neither is configured — callers fall back to logging the
+ * link so the flow still works before SMTP is set up.
  */
-export function transport() {
-  const s = appSettings();
-  if (!s?.smtp_host) return null;
+export function transport(companyId) {
+  const s = mailSettings(companyId);
+  if (!s) return null;
   return nodemailer.createTransport({
     host: s.smtp_host,
     port: s.smtp_port || 587,
@@ -25,19 +26,19 @@ export function transport() {
 }
 
 /**
- * One envelope address for the whole installation, because most mail servers
- * reject a From they do not own — but the display name is the person actually
- * sending, so a recipient sees a name they recognise.
+ * One envelope address per mail account, because most mail servers reject a
+ * From they do not own — but the display name is the person actually sending,
+ * so a recipient sees a name they recognise.
  */
-export function fromAddress(sender) {
-  const s = appSettings();
+export function fromAddress(sender, companyId = sender?.company_id) {
+  const s = mailSettings(companyId);
   const email = s?.from_email || s?.smtp_user || sender?.email;
   const name = sender?.display_name || s?.from_name || config.brand.name;
   return `"${String(name).replace(/"/g, '')}" <${email}>`;
 }
 
-export async function verifySmtp() {
-  const t = transport();
+export async function verifySmtp(companyId) {
+  const t = transport(companyId);
   if (!t) throw new Error('Outgoing mail has not been configured yet.');
   await t.verify();
   return true;
@@ -47,16 +48,21 @@ export async function verifySmtp() {
  * Sends if SMTP is configured, otherwise logs. Never throws into the request
  * path — a mail failure must not lose a document that is already recorded as
  * sent; it is reported back to the sender instead.
+ *
+ * Goes out through the sender's company unless `companyId` says otherwise —
+ * the platform owner inviting a new company's administrator must use that
+ * company's mail, not their own.
  */
-export async function send(sender, { to, subject, html, text, attachments }) {
-  const t = transport();
+export async function send(sender, { to, subject, html, text, attachments }, { companyId = sender?.company_id } = {}) {
+  const t = transport(companyId);
   if (!t) {
     console.log(`\n[mail:not-configured] to=${to}\n  subject=${subject}\n  ${text?.split('\n').join('\n  ')}\n`);
     return { delivered: false, reason: 'Outgoing mail is not configured yet' };
   }
+  ({ html, attachments } = withCompanyLogo({ html, attachments }, companyId));
   try {
     const info = await t.sendMail({
-      from: fromAddress(sender),
+      from: fromAddress(sender, companyId),
       // Replies go to the person who sent the document, not the shared mailbox.
       replyTo: sender?.email ? `"${String(sender.display_name || '').replace(/"/g, '')}" <${sender.email}>` : undefined,
       to, subject, html, text, attachments,
@@ -66,6 +72,33 @@ export async function send(sender, { to, subject, html, text, attachments }) {
     console.error(`[mail:failed] to=${to}: ${err.message}`);
     return { delivered: false, reason: err.message };
   }
+}
+
+/**
+ * Puts the sending company's own logo at the top of its mail in place of the
+ * platform's. Done here rather than in each message builder because only send()
+ * knows which company a message goes out for, and every message carries the
+ * same header image.
+ *
+ * Sized by height, not the 150px width the wordmark uses — a square crest at
+ * that width would fill the screen. Mail without a company (platform mail,
+ * or a company with no logo) is left exactly as it was.
+ */
+export function withCompanyLogo({ html, attachments }, companyId) {
+  const logo = companyLogo(companyId);
+  if (!logo || !html?.includes('cid:signflow-logo')) return { html, attachments };
+  const name = esc(companyById(companyId)?.name || '');
+  const { w, h } = fitLogo(logo.width, logo.height, 200, 56);
+  return {
+    html: html.replace(
+      /<img src="cid:signflow-logo"[^>]*>/,
+      `<img src="cid:company-logo" width="${w}" height="${h}" alt="${name}" style="display:block;border:0;outline:none;text-decoration:none;width:${w}px;height:${h}px;">`
+    ),
+    attachments: [
+      ...(attachments || []).filter((a) => a.cid !== 'signflow-logo'),
+      { filename: `logo.${logo.ext}`, content: logo.bytes, cid: 'company-logo', contentDisposition: 'inline' },
+    ],
+  };
 }
 
 /**
@@ -158,12 +191,14 @@ export function declinedEmail({ doc, recipient, reason }) {
 }
 
 export function invitationToJoinEmail({ invite, inviter, link, expiresAt }) {
-  const org = appSettings()?.org_name;
+  const org = companyById(invite.company_id)?.name;
   return compose({
     subject: `${inviter.display_name} has invited you to ${org || config.brand.name}`,
     heading: 'You have been invited',
     paragraphs: [
-      `<strong>${esc(inviter.display_name)}</strong> has invited you to send and manage documents on ${esc(org || config.brand.name)}.`,
+      invite.role === 'platform'
+        ? `<strong>${esc(inviter.display_name)}</strong> has invited you to run ${esc(config.brand.name)} as a platform owner — creating and managing the organisations that use it.`
+        : `<strong>${esc(inviter.display_name)}</strong> has invited you to send and manage documents on ${esc(org || config.brand.name)}.`,
       'Choose a password using the link below and your account is ready. Nothing else is needed.',
     ],
     lines: [
@@ -173,7 +208,7 @@ export function invitationToJoinEmail({ invite, inviter, link, expiresAt }) {
     cta: { label: 'Accept the invitation', url: link },
     panels: [
       { label: 'Your sign-in email', value: invite.email },
-      { label: 'Role', value: invite.role === 'admin' ? 'Administrator' : 'Member' },
+      { label: 'Role', value: invite.role === 'platform' ? 'Platform owner' : invite.role === 'admin' ? 'Administrator' : 'Member' },
       {
         label: 'Invitation expires',
         value: new Date(expiresAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -207,7 +242,7 @@ export function passwordResetEmail({ user, issuer, link, expiresAt }) {
   });
 }
 
-export function smtpTestEmail({ user }) {
+export function smtpTestEmail({ user, companyId = user.company_id }) {
   return compose({
     subject: `${config.brand.name} — outgoing mail is working`,
     heading: 'Your mail settings work',
@@ -221,13 +256,13 @@ export function smtpTestEmail({ user }) {
     ],
     cta: { label: 'Send a document', url: `${config.baseUrl}/documents/new` },
     panels: (() => {
-      const s = appSettings();
+      const s = mailSettings(companyId);
       return [
-        { label: 'Sending as', value: fromAddress(user) },
+        { label: 'Sending as', value: fromAddress(user, companyId) },
         { label: 'Replies go to', value: user.email },
         { label: 'SMTP server', value: `${s.smtp_host}:${s.smtp_port || 587}${s.smtp_secure ? ' (TLS)' : ' (STARTTLS)'}` },
       ];
     })(),
-    note: 'This applies to everyone on this installation, not just your account. You can send the test again at any time from Settings.',
+    note: 'This applies to everyone who sends through this mail account, not just you. You can send the test again at any time from Settings.',
   });
 }

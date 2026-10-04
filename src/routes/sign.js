@@ -28,7 +28,10 @@ function loadByToken(req, res, next) {
   }
 
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(recipient.document_id);
-  const owner = db.prepare('SELECT * FROM users WHERE id = ?').get(doc.owner_id);
+  // org_name is the sender's company, so the signer sees who is really asking.
+  const owner = db
+    .prepare('SELECT u.*, c.name AS org_name FROM users u LEFT JOIN companies c ON c.id = u.company_id WHERE u.id = ?')
+    .get(doc.owner_id);
 
   if (doc.expires_at && new Date(doc.expires_at) < new Date() && doc.status !== 'completed') {
     return res.status(410).render('sign-closed', {

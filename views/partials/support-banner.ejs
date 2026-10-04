@@ -1,0 +1,13 @@
+<%# Shown on every page while the platform owner is acting as someone else, so it can never be forgotten. %>
+<% if (typeof support !== 'undefined' && support) { const left = Math.max(1, Math.ceil((support.expiresAt - Date.now()) / 60000)); %>
+  <div class="support-bar" role="status">
+    <span class="support-tag">Platform support</span>
+    <span class="support-text">
+      Signed in as <strong><%= user.display_name %></strong> (<%= user.email %>)<% if (company) { %> at <strong><%= company.name %></strong><% } %>
+      · everything you do is recorded as you · ends in <%= left %> min
+    </span>
+    <form method="post" action="/support/exit">
+      <button type="submit" class="btn btn-sm support-exit">Exit support</button>
+    </form>
+  </div>
+<% } %>

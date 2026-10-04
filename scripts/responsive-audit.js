@@ -272,6 +272,8 @@ try {
     ['documents', `${BASE}/documents`, page],
     ['templates', `${BASE}/templates`, page],
     ['template-new', `${BASE}/templates/new`, page],
+    ['platform', `${BASE}/platform`, page],
+    ['platform-mail', `${BASE}/platform/mail`, page],
     ['new', `${BASE}/documents/new`, page],
     ['document', `${BASE}/documents/${docId}`, page],
     ['settings', `${BASE}/settings`, page],

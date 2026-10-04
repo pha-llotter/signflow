@@ -7,7 +7,7 @@
         <h1>Your profile</h1>
         <p class="sub">
           <%= user.email %> ·
-          <%= user.role === 'admin' ? 'Administrator' : 'Member' %>
+          <%= !company ? 'Platform owner' : (user.role === 'admin' ? 'Administrator' : 'Member') + ' at ' + company.name %><%= company && user.platform_admin ? ' · platform owner' : '' %>
         </p>
       </div>
     </div>
@@ -50,12 +50,13 @@
       </div>
     </form>
 
-    <% if (user.role !== 'admin') { %>
+    <% if (company && user.role !== 'admin') { %>
       <div class="card">
         <h2>Organisation settings</h2>
         <p class="hint">
-          Outgoing mail and the people on this installation are managed by an administrator. Documents you send
-          go out through the organisation's mail server, with replies coming back to <%= user.email %>.
+          Outgoing mail and the people in <%= company ? company.name : 'your organisation' %> are managed by an
+          administrator. Documents you send go out through your organisation's mail, with replies coming back to
+          <%= user.email %>.
         </p>
       </div>
     <% } %>

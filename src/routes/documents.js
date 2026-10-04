@@ -63,7 +63,7 @@ router.get('/documents', requireAuth, (req, res) => {
       (!status || d.status === status) &&
       (!needle || [d.title, d.filename, d.recipient_text].some((s) => String(s || '').toLowerCase().includes(needle)))
   );
-  res.render('documents', { docs, total: all.length, counts, status, q, mailReady: mailConfigured() });
+  res.render('documents', { docs, total: all.length, counts, status, q, mailReady: mailConfigured(req.user.company_id) });
 });
 
 router.get('/documents/new', requireAuth, (req, res) => {
@@ -100,8 +100,8 @@ router.post('/documents/new', requireAuth, receivePdf, async (req, res, next) =>
 
     db.prepare(
       `INSERT INTO documents (id, owner_id, title, message, filename, page_count, page_sizes,
-         original_path, original_sha256, status, signing_order, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`
+         original_path, original_sha256, status, signing_order, expires_at, created_at, company_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`
     ).run(
       id,
       req.user.id,
@@ -114,7 +114,8 @@ router.post('/documents/new', requireAuth, receivePdf, async (req, res, next) =>
       sha,
       req.body.signing_order ? 1 : 0,
       new Date(Date.now() + expiryDays * 864e5).toISOString(),
-      nowIso()
+      nowIso(),
+      req.user.company_id
     );
 
     audit({

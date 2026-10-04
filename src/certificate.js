@@ -1,6 +1,7 @@
 import { StandardFonts, rgb } from 'pdf-lib';
 import { config } from './config.js';
 import { embedLogo } from './brand.js';
+import { embedCompanyLogo, fitLogo } from './company-logo.js';
 import { version } from './version.js';
 
 const INK = rgb(0.07, 0.09, 0.13);
@@ -97,11 +98,21 @@ export async function buildCertificate(pdf, { doc, owner, recipients, events }) 
   newPage();
 
   // ---- Header -------------------------------------------------------------
+  // The sending company's own logo leads, above the title. The platform mark
+  // stays top-right, a size smaller: the company issued the document, the
+  // platform sealed it, and the certificate should read in that order.
+  const companyLogo = await embedCompanyLogo(pdf, doc.company_id || owner.company_id);
+  if (companyLogo) {
+    const { w, h } = fitLogo(companyLogo.width, companyLogo.height, 170, 44);
+    page.drawImage(companyLogo, { x: MARGIN, y: y + 12 - h, width: w, height: h });
+    y -= h + 12;
+  }
+
   text('Certificate of Completion', { size: 19, font: bold, color: NAVY });
 
   const logo = await embedLogo(pdf, 'print');
   if (logo) {
-    const logoH = 26;
+    const logoH = companyLogo ? 20 : 26;
     const logoW = (logoH * logo.width) / logo.height;
     page.drawImage(logo, { x: A4[0] - MARGIN - logoW, y: y - 6, width: logoW, height: logoH });
   } else {
@@ -146,6 +157,12 @@ export async function buildCertificate(pdf, { doc, owner, recipients, events }) 
   text(`${owner.display_name}`, { size: 11, font: bold });
   const nameW = bold.widthOfTextAtSize(owner.display_name, 11);
   text(`<${owner.email}>`, { x: MARGIN + nameW + 8, size: 10, color: INK });
+  // The organisation the document was sent on behalf of. Older envelopes and
+  // a sender outside any company simply omit the line.
+  if (owner.org_name) {
+    y -= 13;
+    text(owner.org_name, { size: 9.5, color: MUTED });
+  }
   y -= 30;
 
   // ---- Recipients ---------------------------------------------------------

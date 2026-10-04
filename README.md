@@ -279,9 +279,11 @@ password invalidates every other outstanding link for that account. Members chan
 their own password at `/profile`, which requires the current one — an authenticated
 session is not enough to take an account over permanently.
 
-### Outgoing mail is installation-wide
+### Outgoing mail is per company, with a platform default
 
-SMTP moved from per-user to a single admin-owned record. Members cannot reach
+The platform owner sets one mail account at `/platform/mail` that every company
+uses by default; a company administrator can switch their organisation to its own
+server in Settings, so mail comes from their own domain. Members cannot reach
 Settings, so per-user credentials would leave their invitations silently unable to
 send. Mail goes out from one envelope address (most servers reject a `From` they do
 not own), with the **sending user's name as the display name and their address as
@@ -290,8 +292,8 @@ person.
 
 ### Administration log
 
-Who was invited, promoted, deactivated or reset, and who changed the installation
-settings — shown at the bottom of `/team`. Kept in `admin_events`, separate from the
+Who was invited, promoted, deactivated or reset, and who changed the organisation's
+settings — shown at the bottom of `/team`, and only for the admin's own company. Kept in `admin_events`, separate from the
 per-document `audit_events`, so it survives the deletion of every document those
 people touched.
 
@@ -299,12 +301,78 @@ people touched.
 regress: a member reaching admin pages, a revoked invitation still working, the last
 administrator being removed, and a deactivated account keeping its session.
 
+## Multiple companies
+
+One server hosts any number of organisations. Every account belongs to exactly one
+company (an email address can only be in one), and everything a company owns —
+people, documents, templates, invitations, its administration log — carries its id.
+A company administrator manages their own organisation and cannot see or touch
+another's, even by guessing ids; "team" templates are shared within the company only.
+
+The **platform owner** is a flag on an account, separate from the per-company
+administrator role. They get a Platform page (`/platform`) to add a company and
+invite its first administrator, rename it, invite a replacement administrator, and
+suspend or reactivate it. It is deliberately an **overview**: people, counts and the
+company's administration log, never a document, recipient or signature.
+
+Suspending a company signs its people out and stops them signing in. Nothing is
+deleted, and signing links it already sent keep working, so its recipients are not
+left stranded mid-signature. The platform owner is exempt from their own company's
+suspension, or they could lock themselves out of the page that reverses it.
+
+**Company logos.** A company administrator uploads a logo in Settings (or the
+platform owner does, from the company's page). It leads the certificate of every
+document the company seals — top-left, above the title, with the platform mark kept
+smaller on the right — replaces the platform logo at the top of the company's
+emails, and sits beside its name in the sidebar. PNG or JPG up to 1 MB; the type is
+judged from the file's bytes and proven by embedding it into a scratch PDF, the same
+step sealing performs, so a logo that uploads cannot fail a seal. It is embedded in
+every certificate, so a small file matters. Sealed certificates keep the logo they
+were sealed with, and the file goes when the company is deleted.
+
+**Platform owners need no company.** They are invited from the Platform page into
+no organisation at all, so the operator never appears on a client's team page and
+no client is undeletable because the operator lives there. Such an account sees
+only the platform pages, its profile and Verify — every company page sends it to
+`/platform` — and can still enter any company through a support session. An owner
+who also belongs to a company can have their platform access removed and keeps
+their company role; a company-less owner is deactivated instead. Nobody can remove
+their own access, and the last active owner cannot be removed.
+
+**Support sessions.** From a company's page the platform owner can sign in as one
+of its people to help them — seeing and doing exactly what they can, for up to 60
+minutes. A reason is required, and the start, the end and that reason go into the
+company's own administration log as well as the platform's, so a company can always
+see who came in, when, as whom and why. Anything done meanwhile is attributed to
+both people: admin actions as `owner (platform support, as person)`, document
+events as `person (via platform support: owner)` — in the audit trail, and so on
+the certificate. A banner and an Exit button are on every page; signing out just
+ends the session. Platform owners cannot be impersonated, suspended companies
+cannot be entered, platform pages are closed for the duration, the person's
+last-seen time is left alone, and the session ends itself if it runs out, the
+person is deactivated or their company suspended.
+
+**Deleting** a company is permanent and takes everything it owns: its accounts,
+documents and templates with every recipient, field and audit trail, its
+invitations and administration log, and the PDFs and attachments on disk. Its
+sealed documents stop verifying, because the record they are checked against is
+gone. Two steps stand in front of it — the company must already be suspended, and
+its exact name has to be typed — and a company holding a platform owner's account
+cannot be deleted at all. The platform log keeps a line saying what was removed.
+
+`npm run tenant-check` drives two companies against each other and fails on any
+crossing of that line; it runs as part of every release.
+
 ### Upgrading an existing database
 
 `src/migrate.js` runs on every boot and is idempotent. On a database that predates
 roles it adds the columns, promotes the **oldest account** to administrator (so
 nobody is locked out of Settings), and lifts the first configured user's SMTP
-settings up to the installation record so mail keeps working. Both are logged.
+settings up to the installation record so mail keeps working. On a database that
+predates companies it creates one from the installation's name, moves every user,
+document, invitation and log entry into it, keeps the existing mail as the platform
+default, and makes the founding administrator the platform owner. All of it is
+logged.
 
 ## Dark mode
 

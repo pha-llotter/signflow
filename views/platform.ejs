@@ -1,0 +1,164 @@
+<%- include('partials/head', { title: 'Platform' }) %>
+<%- include('partials/shell-start') %>
+<%
+  const active = companies.filter(function (c) { return c.status === 'active'; }).length;
+  const ago = function (iso) {
+    if (!iso) return 'never';
+    const d = Math.floor((Date.now() - new Date(iso)) / 864e5);
+    return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago';
+  };
+%>
+  <div class="wrap wrap-wide">
+    <div class="page-head">
+      <div>
+        <h1>Platform</h1>
+        <p class="sub"><%= companies.length %> compan<%= companies.length === 1 ? 'y' : 'ies' %> · <%= active %> active</p>
+      </div>
+      <div class="spacer"></div>
+      <a class="btn btn-ghost" href="/platform/mail">Platform mail</a>
+    </div>
+
+    <% if (!platformMail) { %>
+      <div class="banner">
+        <span class="banner-icon">!</span>
+        <div class="banner-body">
+          <strong>Platform mail isn't set up</strong>
+          <p>Companies without their own mail server cannot email invitations or signing links until it is.</p>
+        </div>
+        <a class="btn btn-sm" href="/platform/mail">Set up</a>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <h2>Add a company</h2>
+      <p class="hint">Creates the organisation and emails its first administrator an invitation. They take it from there — inviting their own people and, if they want, connecting their own mail server.</p>
+      <form method="post" action="/platform/companies" class="grid-2" style="margin-top:14px;align-items:end">
+        <div class="field" style="margin-bottom:0">
+          <label for="name">Company name</label>
+          <input id="name" name="name" type="text" required placeholder="e.g. Riverside Primary School">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label for="admin_email">First administrator's email</label>
+          <input id="admin_email" name="admin_email" type="email" required placeholder="principal@riverside.co.za">
+        </div>
+        <div><button class="btn" type="submit">Create and invite</button></div>
+      </form>
+    </div>
+
+    <div class="card" style="padding:14px 8px">
+      <table>
+        <thead><tr><th>Company</th><th>Status</th><th>People</th><th>Documents</th><th>Last active</th><th></th></tr></thead>
+        <tbody>
+          <% companies.forEach(function (c) { %>
+            <tr>
+              <td class="td-primary">
+                <a href="/platform/companies/<%= c.id %>" style="font-weight:650;color:var(--text)"><%= c.name %></a>
+                <div class="hint" style="margin:2px 0 0">
+                  <%= c.admins ? 'Admin: ' + c.admins : (c.pending ? 'Administrator invited, not yet joined' : 'No administrator') %>
+                </div>
+              </td>
+              <td data-label="Status"><span class="pill <%= c.status === 'active' ? 'pill-completed' : 'pill-declined' %>"><%= c.status %></span></td>
+              <td data-label="People"><%= c.users %><% if (c.pending) { %> <span class="hint">+<%= c.pending %> invited</span><% } %></td>
+              <td data-label="Documents"><%= c.documents %> <span class="hint">· <%= c.sent30 %> sent in 30 days</span></td>
+              <td data-label="Last active" class="hint"><%= ago(c.last_active) %></td>
+              <td class="td-action"><a class="btn btn-ghost btn-sm" href="/platform/companies/<%= c.id %>">Manage</a></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Platform owners</h2>
+      <p class="hint">
+        Everyone who can reach this page. A platform owner needs no company; one who also belongs to a company keeps
+        that role if their platform access is removed. You cannot remove yourself, and the last active owner cannot
+        be removed.
+      </p>
+      <table style="margin-top:10px">
+        <thead><tr><th>Name</th><th>Company</th><th>Status</th><th>Last seen</th><th></th></tr></thead>
+        <tbody>
+          <% owners.forEach(function (o) { %>
+            <tr>
+              <td class="td-primary"><strong><%= o.display_name %></strong><% if (o.id === user.id) { %> <span class="role-tag">You</span><% } %><div class="hint"><%= o.email %></div></td>
+              <td data-label="Company"><%= o.company_name || '—' %></td>
+              <td data-label="Status"><span class="pill <%= o.status === 'active' ? 'pill-completed' : 'pill-declined' %>"><%= o.status === 'active' ? 'active' : 'deactivated' %></span></td>
+              <td data-label="Last seen" class="hint"><%= ago(o.last_seen_at) %></td>
+              <td class="td-action">
+                <% if (o.id !== user.id) { %>
+                  <% if (o.status === 'active') { %>
+                    <form method="post" action="/platform/owners/<%= o.id %>/remove" class="inline"
+                          onsubmit="return confirm('<%= o.company_name ? 'Remove platform access? They stay in their company.' : 'Deactivate this platform owner? They will not be able to sign in.' %>')">
+                      <button class="btn btn-danger btn-sm" type="submit"><%= o.company_name ? 'Remove access' : 'Deactivate' %></button>
+                    </form>
+                  <% } else { %>
+                    <form method="post" action="/platform/owners/<%= o.id %>/restore" class="inline">
+                      <button class="btn btn-ghost btn-sm" type="submit">Restore</button>
+                    </form>
+                  <% } %>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+
+      <% if (ownerInvites.length) { %>
+        <table style="margin-top:12px">
+          <thead><tr><th>Invited</th><th>Expires</th><th>Link</th><th></th></tr></thead>
+          <tbody>
+            <% ownerInvites.forEach(function (i) { %>
+              <tr>
+                <td class="td-primary"><strong><%= i.email %></strong></td>
+                <td data-label="Expires" class="hint"><%= new Date(i.expires_at).toLocaleDateString() %></td>
+                <td data-label="Link"><button class="link-btn copy-link" type="button" data-link="<%= baseUrl %>/invite/<%= i.token %>">Copy link</button></td>
+                <td class="td-action">
+                  <form method="post" action="/platform/owners/invites/<%= i.id %>/revoke" class="inline">
+                    <button class="btn btn-ghost btn-sm" type="submit">Withdraw</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+
+      <form method="post" action="/platform/owners/invite" class="role-row" style="margin-top:14px">
+        <input name="email" type="email" required placeholder="Invite a platform owner — name@example.com" aria-label="Email address">
+        <button class="btn btn-sm" type="submit">Invite owner</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Platform log</h2>
+      <p class="hint">Companies created, renamed, suspended or reactivated, and changes to platform mail. Each company's own log is on its page.</p>
+      <% if (!events.length) { %>
+        <p class="hint">Nothing yet.</p>
+      <% } else { %>
+        <ul class="audit" style="margin-top:14px">
+          <% events.forEach(function (e) { %>
+            <li>
+              <time><%= new Date(e.created_at).toLocaleString() %></time>
+              <div>
+                <span class="who"><%= e.actor_email %></span> — <%= e.action %><% if (e.subject) { %>: <%= e.subject %><% } %>
+                <% if (e.detail) { %><span class="det"><%= e.detail %></span><% } %>
+              </div>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </div>
+  </div>
+
+<script>
+  document.querySelectorAll('.copy-link').forEach((b) => {
+    b.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(b.dataset.link);
+      const was = b.textContent;
+      b.textContent = 'Copied';
+      setTimeout(() => { b.textContent = was; }, 1400);
+    });
+  });
+</script>
+
+<%- include('partials/shell-end') %>

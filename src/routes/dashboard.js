@@ -49,6 +49,9 @@ router.get('/dashboard', requireAuth, (req, res) => {
   // signing order on this never surfaces a document before it is their turn.
   // Linking straight to the signing page is safe: the account's email is the
   // address the token was sent to, and accounts exist only by invitation.
+  // Only the user's own company: a document another company sent to the same
+  // address still reached them by email, but its title and sender are that
+  // company's to show, not this one's.
   const waitingForMe = db
     .prepare(
       `SELECT d.id, d.title, d.sent_at, r.token, u.display_name AS sender
@@ -59,10 +62,11 @@ router.get('/dashboard', requireAuth, (req, res) => {
          AND r.status IN ('pending', 'viewed')
          AND r.token IS NOT NULL
          AND d.status = 'sent'
+         AND d.company_id = ?
          AND (d.expires_at IS NULL OR d.expires_at > ?)
        ORDER BY d.sent_at`
     )
-    .all(req.user.email, new Date(now).toISOString());
+    .all(req.user.email, req.user.company_id, new Date(now).toISOString());
 
   const by = (status) => docs.filter((d) => d.status === status);
   const sent = by('sent');
@@ -143,7 +147,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
     stats,
     columns,
     totals: { drafts: drafts.length, all: docs.length, completed: completed.length },
-    mailReady: mailConfigured(),
+    mailReady: mailConfigured(req.user.company_id),
   });
 });
 
