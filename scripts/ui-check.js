@@ -112,7 +112,7 @@ try {
   await page.goto(`${BASE}/documents`);
 
   // --- responsive layout ---------------------------------------------------
-  // The nav logo is a 440px asset shown at 22px. If the stylesheet fails to
+  // The nav logo is a 440px asset shown at ~34px tall. If the stylesheet fails to
   // apply it renders at natural size and shoves the page sideways, which is
   // exactly the kind of break that looks fine in a unit test.
   for (const [label, width, height] of [['desktop', 1600, 1000], ['mobile', 390, 844]]) {
@@ -139,7 +139,7 @@ try {
     });
 
     check(`${label}: nav logo is scaled down, not natural size`,
-      m.logoH > 8 && m.logoH <= 30 && m.logoW <= 160, `${m.logoW}x${m.logoH}px`);
+      m.logoH > 8 && m.logoH <= 40 && m.logoW <= 180, `${m.logoW}x${m.logoH}px`);
     check(`${label}: page does not scroll horizontally`,
       m.scrollW <= m.clientW + 1, `scrollWidth ${m.scrollW} vs clientWidth ${m.clientW}`);
     // On a page shorter than the viewport the footer must still reach the

@@ -163,8 +163,18 @@ h1, h2, h3 { letter-spacing: -.011em; }
   z-index: 50;
 }
 
-.side-brand { display: flex; align-items: center; padding: 22px 22px 16px; flex: none; }
-.side-brand img { height: 24px; width: auto; display: block; }
+/* The logo and the collapse toggle share the top row of the sidebar. */
+.side-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 22px 14px 18px 22px; flex: none; }
+.side-brand { display: flex; align-items: center; flex: none; min-width: 0; }
+.collapse-toggle {
+  flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0;
+  border: 1px solid transparent; border-radius: var(--r-sm); background: none; color: var(--text-3); cursor: pointer;
+}
+.collapse-toggle:hover { background: var(--surface-2); border-color: var(--border); color: var(--text); }
+.collapse-toggle svg { transition: transform .18s ease; }
+/* 34px tall is ~150px wide: it fills the sidebar's width without crowding the
+   Create new button, and the 99px-tall source stays sharp on a 2x screen. */
+.side-brand img { height: 34px; width: auto; max-width: 100%; display: block; }
 .side-brand:hover { text-decoration: none; }
 
 .side-cta { padding: 2px 16px 14px; flex: none; }
@@ -193,6 +203,40 @@ h1, h2, h3 { letter-spacing: -.011em; }
 }
 .create-pop a small { display: block; font-size: 12px; font-weight: 400; color: var(--text-3); margin-top: 1px; }
 .create-pop a:hover { background: var(--surface-2); text-decoration: none; }
+
+/* ---- collapsing to a rail of icons (wide screens only) ----
+   Labels hide and become tooltips (every item has a title), the wordmark gives
+   way to the square mark, and Documents shows as one icon because its
+   sub-items have nowhere to go. Below the drawer breakpoint none of this
+   applies: there the sidebar is a full-width drawer either way. */
+.side-brand .brand-mark { display: none; }
+.side-nav .side-docs-rail { display: none; }
+.sidebar { transition: width .18s ease; }
+
+@media (min-width: 901px) {
+  :root[data-sidebar="collapsed"] { --sidebar-w: 76px; }
+  :root[data-sidebar="collapsed"] .sidebar .nav-label,
+  :root[data-sidebar="collapsed"] .sidebar .chev,
+  :root[data-sidebar="collapsed"] .side-group,
+  :root[data-sidebar="collapsed"] .side-foot,
+  :root[data-sidebar="collapsed"] .side-brand .brand-full { display: none; }
+  :root[data-sidebar="collapsed"] .side-nav .side-docs-rail { display: flex; }
+  /* Collapsed, the toggle drops under the mark and points the other way. */
+  :root[data-sidebar="collapsed"] .side-top { flex-direction: column; gap: 10px; padding: 22px 0 14px; }
+  :root[data-sidebar="collapsed"] .collapse-toggle svg { transform: rotate(180deg); }
+  :root[data-sidebar="collapsed"] .side-brand .brand-mark { display: block; width: 32px; height: 32px; }
+  :root[data-sidebar="collapsed"] .side-cta { padding: 2px 14px 14px; }
+  :root[data-sidebar="collapsed"] .btn-create { padding: 12px 0; gap: 0; }
+  /* The menu cannot fit inside a 76px rail, so it opens out over the page. */
+  :root[data-sidebar="collapsed"] .create-pop { right: auto; width: 250px; }
+  :root[data-sidebar="collapsed"] .side-nav { padding-left: 12px; padding-right: 12px; }
+  :root[data-sidebar="collapsed"] .side-nav a { justify-content: center; gap: 0; padding: 11px 0; }
+  :root[data-sidebar="collapsed"] .side-sect { display: none; }
+}
+/* In the phone drawer there is nothing to collapse to. */
+@media (max-width: 900px) {
+  .collapse-toggle { display: none; }
+}
 
 .side-nav { display: flex; flex-direction: column; gap: 2px; padding: 4px 12px 12px; flex: 1; overflow-y: auto; }
 .side-sect {
@@ -1067,14 +1111,18 @@ body.no-scroll { display: flex; flex-direction: column; }
 /* --------------------------------------------------------------- footer ---- */
 
 .app-main .siteftr .wrap { max-width: 1320px; }
-.siteftr { border-top: 1px solid var(--border); padding: 22px 0 30px; margin-top: auto; flex-shrink: 0; }
-.siteftr .ftr-logo { height: 19px; width: auto; max-width: 140px; display: block; margin: 0 0 11px; opacity: .72; }
-.siteftr p { margin: 0 0 8px; font-size: 13px; color: var(--text-2); }
-.siteftr p:empty { display: none; }
-.siteftr .fine { font-size: 11.5px; color: var(--text-3); line-height: 1.55; max-width: 780px; }
-.siteftr .ver {
-  font-family: var(--mono); font-size: 11px; color: var(--text-3);
-  padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; margin-left: 4px;
+/* One quiet row — who, and the three things worth knowing — then the legal
+   caveat as fine print, rather than a paragraph of small text. */
+.siteftr { border-top: 1px solid var(--border); padding: 18px 0 22px; margin-top: auto; flex-shrink: 0; }
+.ftr-top { display: flex; align-items: center; justify-content: space-between; gap: 12px 28px; flex-wrap: wrap; }
+.ftr-brand { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--text-3); }
+.siteftr .ftr-logo { height: 18px; width: auto; max-width: 140px; display: block; opacity: .8; }
+.ftr-trust { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.ftr-trust li { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); }
+.ftr-trust svg { color: var(--text-3); flex: none; }
+.siteftr .fine {
+  margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--border);
+  font-size: 11.5px; color: var(--text-3); line-height: 1.55;
 }
 
 .recipient-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; margin-bottom: 10px; align-items: start; }
@@ -1131,7 +1179,7 @@ body.no-scroll { display: flex; flex-direction: column; }
   .app-topbar { gap: 12px; min-height: 0; padding: 10px 14px; }
   .app-topbar .nav-toggle { display: inline-grid; }
   .app-topbar .brand { display: flex; align-items: center; }
-  .app-topbar .brand img { height: 21px; width: auto; display: block; }
+  .app-topbar .brand img { height: 26px; width: auto; display: block; }
   /* No room for search up here; the Documents page carries its own box. */
   .top-search, .user-menu > summary .who-name { display: none; }
   .top-right { gap: 8px; }

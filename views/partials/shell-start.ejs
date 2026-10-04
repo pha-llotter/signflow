@@ -11,21 +11,43 @@
   // only the platform pages and their own profile.
   const inCompany = typeof company !== 'undefined' && !!company;
   const home = inCompany ? '/dashboard' : '/platform';
+  // Every item carries its label twice: as text, hidden when the sidebar is
+  // collapsed to a rail of icons, and as a title, which is then its tooltip.
+  const navLink = (href, active, d, label) =>
+    `<a href="${href}" class="${active ? 'active' : ''}" title="${label}">${icon(d)}<span class="nav-label">${label}</span></a>`;
+  const DASH_ICON = '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"></rect><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"></rect><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"></rect><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"></rect>';
+  const DOC_ICON = '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M9 13h6M9 17h4"></path>';
+  const TEMPLATE_ICON = '<rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path>';
+  const VERIFY_ICON = '<path d="M12 3l7.5 3.3v5c0 4.6-3.2 8.3-7.5 9.4-4.3-1.1-7.5-4.8-7.5-9.4v-5z"></path><path d="m9 12 2.2 2.2L15.5 10"></path>';
+  const PROFILE_ICON = '<circle cx="12" cy="8" r="3.6"></circle><path d="M5 20.5v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"></path>';
+  const TEAM_ICON = '<path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20"></path><circle cx="10" cy="8" r="3.2"></circle><path d="M20 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.4 5.2a3.2 3.2 0 0 1 0 5.6"></path>';
+  const ACTIVITY_ICON = '<path d="M4 12h3l2.5-6 5 12 2.5-6h3"></path>';
+  const SETTINGS_ICON = '<circle cx="12" cy="12" r="2.8"></circle><path d="M19.4 14.5a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.6 1.6 0 0 0-1-1.4 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.6 1.6 0 0 0 1.4-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 1 1.4 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.6 1.6 0 0 0-1.4 1z"></path>';
+  const PLATFORM_ICON = '<path d="M3 21h18"></path><path d="M5 21V8l7-4 7 4v13"></path><path d="M9 21v-6h6v6"></path>';
+  const ORG_ICON = '<path d="M12 3l7.5 3.3v5c0 4.6-3.2 8.3-7.5 9.4-4.3-1.1-7.5-4.8-7.5-9.4v-5z"></path>';
   const icon = (d) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 %>
 <div class="app">
   <aside class="sidebar" id="sidebar">
-    <a class="side-brand" href="<%= home %>">
-      <img src="/static/brand/logo-web.png?v=<%= v %>" alt="<%= brand.name %>" width="103" height="23">
-    </a>
+    <div class="side-top">
+      <a class="side-brand" href="<%= home %>" title="<%= brand.name %>">
+        <img class="brand-full" src="/static/brand/logo-web.png?v=<%= v %>" alt="<%= brand.name %>" width="103" height="23">
+        <img class="brand-mark" src="/static/brand/logo-mark.png?v=<%= v %>" alt="" width="32" height="32">
+      </a>
+      <button type="button" class="collapse-toggle" id="sidebar-collapse" aria-controls="sidebar"
+              aria-label="Collapse sidebar" title="Collapse or expand the sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"></path><path d="m18 17-5-5 5-5"></path></svg>
+      </button>
+    </div>
 
     <% if (inCompany) { %>
     <div class="side-cta">
       <details class="create-menu">
-        <summary class="btn btn-create">
+        <summary class="btn btn-create" title="Create new">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
                stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
-          Create new
+          <span class="nav-label">Create new</span>
           <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
         </summary>
@@ -40,15 +62,12 @@
 
     <nav class="side-nav">
       <% if (inCompany) { %>
-      <a href="/dashboard" class="<%= here('/dashboard') ? 'active' : '' %>">
-        <%- icon('<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"></rect><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"></rect><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"></rect><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"></rect>') %>
-        Dashboard
-      </a>
+      <%- navLink('/dashboard', here('/dashboard'), DASH_ICON, 'Dashboard') %>
 
       <details class="side-group" open>
         <summary class="<%= here('/documents') && docFilter === null && path !== '/documents/trash' ? 'active' : '' %>">
-          <%- icon('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M9 13h6M9 17h4"></path>') %>
-          Documents
+          <%- icon(DOC_ICON) %>
+          <span class="nav-label">Documents</span>
           <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
         </summary>
@@ -59,43 +78,24 @@
           <a href="/documents/trash" class="<%= path === '/documents/trash' ? 'active' : '' %>">Trash</a>
         </div>
       </details>
+      <%# A collapsed rail has no room for the sub-items, so Documents is one icon there. %>
+      <a href="/documents" class="side-docs-rail <%= here('/documents') ? 'active' : '' %>" title="Documents"><%- icon(DOC_ICON) %><span class="nav-label">Documents</span></a>
 
-      <a href="/templates" class="<%= here('/templates') ? 'active' : '' %>">
-        <%- icon('<rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path>') %>
-        Templates
-      </a>
+      <%- navLink('/templates', here('/templates'), TEMPLATE_ICON, 'Templates') %>
       <% } %>
-      <a href="/verification" class="<%= here('/verification') ? 'active' : '' %>">
-        <%- icon('<path d="M12 3l7.5 3.3v5c0 4.6-3.2 8.3-7.5 9.4-4.3-1.1-7.5-4.8-7.5-9.4v-5z"></path><path d="m9 12 2.2 2.2L15.5 10"></path>') %>
-        Verify a document
-      </a>
-      <a href="/profile" class="<%= here('/profile') ? 'active' : '' %>">
-        <%- icon('<circle cx="12" cy="8" r="3.6"></circle><path d="M5 20.5v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"></path>') %>
-        Profile
-      </a>
+      <%- navLink('/verification', here('/verification'), VERIFY_ICON, 'Verify a document') %>
+      <%- navLink('/profile', here('/profile'), PROFILE_ICON, 'Profile') %>
 
       <% if (isAdmin) { %>
-        <a href="/team" class="<%= here('/team') ? 'active' : '' %>">
-          <%- icon('<path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20"></path><circle cx="10" cy="8" r="3.2"></circle><path d="M20 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.4 5.2a3.2 3.2 0 0 1 0 5.6"></path>') %>
-          Team
-        </a>
-        <a href="/activity" class="<%= here('/activity') ? 'active' : '' %>">
-          <%- icon('<path d="M4 12h3l2.5-6 5 12 2.5-6h3"></path>') %>
-          Activity log
-        </a>
-        <a href="/settings" class="<%= here('/settings') ? 'active' : '' %>">
-          <%- icon('<circle cx="12" cy="12" r="2.8"></circle><path d="M19.4 14.5a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.6 1.6 0 0 0-1-1.4 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.6 1.6 0 0 0 1.4-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 1 1.4 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.6 1.6 0 0 0-1.4 1z"></path>') %>
-          Settings
-        </a>
+        <%- navLink('/team', here('/team'), TEAM_ICON, 'Team') %>
+        <%- navLink('/activity', here('/activity'), ACTIVITY_ICON, 'Activity log') %>
+        <%- navLink('/settings', here('/settings'), SETTINGS_ICON, 'Settings') %>
       <% } %>
     </nav>
 
     <% if (isPlatformAdmin) { %>
       <nav class="side-nav side-platform" aria-label="Platform">
-        <a href="/platform" class="<%= here('/platform') ? 'active' : '' %>">
-          <%- icon('<path d="M3 21h18"></path><path d="M5 21V8l7-4 7 4v13"></path><path d="M9 21v-6h6v6"></path>') %>
-          Platform
-        </a>
+        <%- navLink('/platform', here('/platform'), PLATFORM_ICON, 'Platform') %>
       </nav>
     <% } %>
 
@@ -105,9 +105,9 @@
           <% if (company && company.logo_path) { %>
             <img class="side-org-logo" src="/company-logo/<%= company.id %>?v=<%= encodeURIComponent(company.logo_updated_at || '') %>" alt="">
           <% } else { %>
-          <%- icon('<path d="M12 3l7.5 3.3v5c0 4.6-3.2 8.3-7.5 9.4-4.3-1.1-7.5-4.8-7.5-9.4v-5z"></path>') %>
+          <%- icon(ORG_ICON) %>
           <% } %>
-          <span><%= orgName %></span>
+          <span class="nav-label"><%= orgName %></span>
         </div>
       <% } %>
       <div class="side-ver" title="Build currently running"><%= brand.name %> <%= appVersion.short %></div>

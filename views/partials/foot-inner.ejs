@@ -1,21 +1,32 @@
 <footer class="siteftr">
   <div class="wrap">
-    <img class="ftr-logo" src="/static/brand/logo-web.png?v=<%= v %>" alt="<%= brand.name %>" width="85" height="19">
-    <p>
-      <% if (brand.legalName) { %><%= brand.legalName %><% } %><% if (brand.regNo) { %> · Reg. No. <%= brand.regNo %><% } %>
-      <span class="ver" title="Build currently running"><%= appVersion.short %></span>
-    </p>
+    <div class="ftr-top">
+      <div class="ftr-brand">
+        <img class="ftr-logo" src="/static/brand/logo-web.png?v=<%= v %>" alt="<%= brand.name %>" width="85" height="19">
+        <span>
+          © <%= new Date().getFullYear() %> <%= brand.legalName || brand.name %><% if (brand.regNo) { %> · Reg. No. <%= brand.regNo %><% } %>
+        </span>
+      </div>
+      <ul class="ftr-trust">
+        <li title="<%= dataRegion %>">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>
+          Data stored in <%= dataRegionShort %>
+        </li>
+        <li title="Standard electronic signatures under the Electronic Communications and Transactions Act 25 of 2002">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7.5 3.3v5c0 4.6-3.2 8.3-7.5 9.4-4.3-1.1-7.5-4.8-7.5-9.4v-5z"></path><path d="m9 12 2.2 2.2L15.5 10"></path></svg>
+          Electronic signatures under the ECT Act
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9.5" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+          SHA-256 sealed with a full audit trail
+        </li>
+      </ul>
+    </div>
     <p class="fine">
-      Documents stored in <%= dataRegion %>. Signatures are standard electronic signatures under the
-      Electronic Communications and Transactions Act 25 of 2002, recorded with a full audit trail and a
-      SHA-256 seal. This is general information, not legal advice — a few documents (wills, the sale of
-      land, bills of exchange, long-term leases) cannot be signed electronically at all.
+      General information, not legal advice. Wills, the sale of land, bills of exchange and long-term leases cannot be signed electronically.
+      <% if (brand.informationOfficer || brand.popiaRegNo) { %>
+        POPIA Information Officer: <%= brand.informationOfficer || 'not set' %><% if (brand.popiaRegNo) { %> · Registration No. <%= brand.popiaRegNo %><% } %>.
+      <% } %>
     </p>
-    <% if (brand.informationOfficer || brand.popiaRegNo) { %>
-      <p class="fine">
-        POPIA Information Officer: <%= brand.informationOfficer || 'not set' %><% if (brand.popiaRegNo) { %>
-        · Registration No. <%= brand.popiaRegNo %><% } %>
-      </p>
-    <% } %>
   </div>
 </footer>

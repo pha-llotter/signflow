@@ -76,6 +76,7 @@ app.use(currentUser);
 app.use((req, res, next) => {
   res.locals.brand = config.brand;
   res.locals.dataRegion = config.dataRegion;
+  res.locals.dataRegionShort = config.dataRegionShort;
   res.locals.v = ASSET_VERSION;
   res.locals.appVersion = version;
   // Lets the sidebar mark the current section without each view passing it in.

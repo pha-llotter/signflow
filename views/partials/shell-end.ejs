@@ -38,6 +38,52 @@
     });
   })();
 
+  // Collapsing the sidebar to a rail of icons, on wide screens. The choice is
+  // remembered per browser and re-applied by the inline script in the head.
+  (function () {
+    var btn = document.getElementById('sidebar-collapse');
+    if (!btn) return;
+    var root = document.documentElement;
+    function sync() {
+      var collapsed = root.getAttribute('data-sidebar') === 'collapsed';
+      btn.setAttribute('aria-expanded', String(!collapsed));
+      btn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    }
+    btn.addEventListener('click', function () {
+      var collapse = root.getAttribute('data-sidebar') !== 'collapsed';
+      if (collapse) root.setAttribute('data-sidebar', 'collapsed');
+      else root.removeAttribute('data-sidebar');
+      try { localStorage.setItem('signflow-sidebar', collapse ? 'collapsed' : 'expanded'); } catch (e) {}
+      sync();
+    });
+    sync();
+  })();
+
+  // The sidebar's foot and the page footer each draw a rule across the top.
+  // The sidebar is pinned to the bottom of the window and the footer sits at
+  // the bottom of the page, so if the two boxes are the same height their rules
+  // meet as one line once the page is scrolled to the end. Each sizes to its
+  // own content, so they are made equal: the taller one sets the height.
+  (function () {
+    var foot = document.querySelector('.app-main .siteftr');
+    var side = document.querySelector('.side-foot');
+    if (!foot || !side) return;
+    function align() {
+      foot.style.minHeight = '';
+      side.style.minHeight = '';
+      // Collapsed, or in the phone drawer, there is no second rule to meet.
+      if (!side.offsetHeight || window.innerWidth <= 900) return;
+      var h = Math.max(foot.offsetHeight, side.offsetHeight);
+      foot.style.minHeight = h + 'px';
+      side.style.minHeight = h + 'px';
+    }
+    align();
+    window.addEventListener('resize', align);
+    // The company logo may finish loading after this runs and grow the foot.
+    side.querySelectorAll('img').forEach(function (img) { img.addEventListener('load', align); });
+    document.getElementById('sidebar-collapse')?.addEventListener('click', function () { setTimeout(align, 0); });
+  })();
+
   // The account menu is a <details>, which opens without script; this only
   // closes it again on an outside click or Escape, as a menu is expected to.
   // The same goes for the Create new menu in the sidebar.

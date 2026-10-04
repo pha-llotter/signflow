@@ -16,6 +16,13 @@
         t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
       document.documentElement.setAttribute('data-theme', t);
+      // The collapsed sidebar is restored here too, before paint, or the full
+      // sidebar would flash open and snap shut on every page load.
+      try {
+        if (localStorage.getItem('signflow-sidebar') === 'collapsed') {
+          document.documentElement.setAttribute('data-sidebar', 'collapsed');
+        }
+      } catch (e) { /* storage blocked: start expanded */ }
     })();
   </script>
   <link rel="stylesheet" href="/static/css/app.css?v=<%= v %>">
