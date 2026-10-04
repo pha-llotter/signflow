@@ -14,7 +14,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: con
  *
  *   public  — /, /verify/:id  — for anyone holding a sealed PDF. The /verify/:id
  *             address is printed on every certificate and encoded in QR fields,
- *             and the people following it (signers, a bank, a parent) have no
+ *             and the people following it (signers, a bank, a client) have no
  *             account, so it must never require one.
  *   in-app  — /verification, /verification/:id — the same checks for signed-in
  *             people, inside the app with its sidebar like every other page.

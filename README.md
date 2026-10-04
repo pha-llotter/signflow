@@ -234,7 +234,7 @@ recorded hash, or upload a PDF and have it hashed and matched:
 
 - **Public** — `/` and `/verify/<id>`. No account. `/verify/<id>` is printed on every
   certificate and encoded in QR fields, and the people following it (signers, a
-  bank, a parent) have no account, so it must never require one.
+  bank, a client) have no account, so it must never require one.
 - **In-app** — `/verification` and `/verification/<id>`. Signed-in only, inside the app
   with the sidebar; it is where the sidebar's *Verify a document* goes.
 

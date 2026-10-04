@@ -1,11 +1,15 @@
-<%# A company's logo: preview, upload and remove. `c` is the company; `base` is the URL the forms post under. %>
-<div class="card">
-  <h2>Logo</h2>
-  <p class="hint">
-    Printed at the top of every certificate <%= c.name %> seals, shown at the top of its emails and in the sidebar.
-    PNG or JPG, up to 1 MB — a few hundred KB is plenty, since it is embedded in every certificate. A wide logo on a
-    transparent background reads best.
-  </p>
+<%# A company's logo: preview, upload and remove. `c` is the company; `base` is the URL the forms post under.
+    `intro: false` leaves out the heading and description, for a page that already gives them. %>
+<% const withIntro = typeof intro === 'undefined' || intro; %>
+<div class="card<%= withIntro ? '' : ' set-card' %>">
+  <% if (withIntro) { %>
+    <h2>Logo</h2>
+    <p class="hint">
+      Printed at the top of every certificate <%= c.name %> seals, shown at the top of its emails and in the sidebar.
+      PNG or JPG, up to 1 MB — a few hundred KB is plenty, since it is embedded in every certificate. A wide logo on a
+      transparent background reads best.
+    </p>
+  <% } %>
   <% if (c.logo_path) { %>
     <div class="logo-preview">
       <img src="/company-logo/<%= c.id %>?v=<%= encodeURIComponent(c.logo_updated_at || '') %>" alt="<%= c.name %> logo">

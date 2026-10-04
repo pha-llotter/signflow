@@ -135,7 +135,7 @@ export function requireAdmin(req, res, next) {
 
 /**
  * The platform pages: creating and suspending companies. Separate from the
- * per-company administrator role — a school's admin manages their school, not
+ * per-company administrator role — a company's admin manages their company, not
  * the platform. 404 for anyone else, so the pages do not advertise themselves.
  */
 export function requirePlatform(req, res, next) {

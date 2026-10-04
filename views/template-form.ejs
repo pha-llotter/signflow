@@ -55,7 +55,7 @@
           <% values.roles.forEach(function (r) { %>
             <div class="role-row">
               <input type="hidden" name="role_id" value="<%= r.id %>">
-              <input type="text" name="role_name" value="<%= r.name %>" placeholder="e.g. Parent" aria-label="Role" required>
+              <input type="text" name="role_name" value="<%= r.name %>" placeholder="e.g. Client" aria-label="Role" required>
               <button type="button" class="btn btn-ghost btn-sm remove-role">Remove</button>
             </div>
           <% }); %>

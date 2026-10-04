@@ -107,7 +107,7 @@ router.post('/templates/new', requireAuth, (req, res, next) => {
           : err.message || 'That upload could not be read.');
       }
       if (!req.file) return fail('Choose a PDF to upload.');
-      if (!values.roles.length) return fail('Add at least one role, such as "Parent" or "Employee".');
+      if (!values.roles.length) return fail('Add at least one role, such as "Client" or "Employee".');
 
       let pdf;
       try {

@@ -61,10 +61,18 @@ export function savePlatformMail(values, actor) {
   saveMail('app_settings', 1, platformSettings(), values, actor);
 }
 
-/** A company's name, and its own mail server unless it chose the platform's. */
+/**
+ * A company's name, and its own mail server unless it chose the platform's.
+ * Each Settings section is its own form, so only what was submitted changes:
+ * saving the name must never clear the mail server, and vice versa.
+ */
 export function saveCompanySettings(companyId, values, actor) {
   const current = companyById(companyId);
   const name = String(values.name || '').trim().slice(0, 120);
   if (name) db.prepare('UPDATE companies SET name = ? WHERE id = ?').run(name, companyId);
-  saveMail('companies', companyId, current, values.mail_source === 'own' ? values : {}, actor);
+  if (values.mail_source !== undefined) {
+    saveMail('companies', companyId, current, values.mail_source === 'own' ? values : {}, actor);
+  } else {
+    db.prepare('UPDATE companies SET updated_at = ?, updated_by = ? WHERE id = ?').run(nowIso(), actor?.id ?? null, companyId);
+  }
 }

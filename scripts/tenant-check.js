@@ -136,11 +136,17 @@ try {
   const r2 = db.prepare('SELECT * FROM companies WHERE id=?').get(riverside.id);
   check('rename and own mail server saved on their company only', r2.name === 'Riverside Primary School' && r2.smtp_host === 'smtp.riverside.test' && !db.prepare('SELECT smtp_host FROM companies WHERE id=?').get(protea.id).smtp_host);
   check('their sidebar shows the new name', (await text(head, '/dashboard')).includes('Riverside Primary School'));
+  // Settings sections save separately: the name alone must not touch the mail
+  // server, and the mail alone must not touch the name.
+  await head('POST', '/settings', form({ name: 'Riverside Primary School' }));
+  check('saving only the name keeps their own mail server', db.prepare('SELECT smtp_host FROM companies WHERE id = ?').get(riverside.id).smtp_host === 'smtp.riverside.test');
+  await head('POST', '/settings', form({ mail_source: 'own', smtp_host: 'smtp.riverside.test', smtp_port: '587', from_email: 'noreply@riverside.test' }));
+  check('saving only the mail keeps the name', db.prepare('SELECT name FROM companies WHERE id = ?').get(riverside.id).name === 'Riverside Primary School');
   await owner('POST', '/platform/mail', form({ smtp_host: 'smtp.platform.test', smtp_port: '587', from_email: 'noreply@platform.test' }));
   const rows = db.prepare('SELECT smtp_host FROM app_settings').get();
   check('platform mail saved as the default', rows.smtp_host === 'smtp.platform.test');
-  check('Protea (no override) shows platform mail in Settings', (await text(owner, '/settings')).includes('In effect: SignFlow mail'));
-  check('Riverside shows its own server in Settings', (await text(head, '/settings')).includes('In effect: your own server, smtp.riverside.test'));
+  check('Protea (no override) shows platform mail in Settings', (await text(owner, '/settings')).includes('Using SignFlow mail'));
+  check('Riverside shows its own server in Settings', (await text(head, '/settings')).includes('Using your server · smtp.riverside.test'));
   await head('POST', '/settings', form({ name: 'Riverside Primary School', mail_source: 'platform', smtp_host: 'ignored.test' }));
   check('switching back to platform mail clears the override', !db.prepare('SELECT smtp_host FROM companies WHERE id=?').get(riverside.id).smtp_host);
 

@@ -1,32 +1,49 @@
 <%- include('partials/head', { title: 'Settings' }) %>
 <%- include('partials/shell-start') %>
-
-  <div class="wrap" style="max-width:720px">
+<%
+  const mailState = !effective
+    ? { tone: 'warn', text: 'No mail account in effect' }
+    : effective.source === 'company'
+      ? { tone: 'ok', text: 'Using your server · ' + effective.smtp_host }
+      : { tone: 'ok', text: 'Using ' + brand.name + ' mail' };
+%>
+  <div class="wrap settings-page">
     <div class="page-head">
       <div>
         <h1>Settings</h1>
-        <p class="sub">These apply to everyone in <%= settings.name %>, not just your account.</p>
+        <p class="sub">These apply to everyone in your organisation, not just your account.</p>
       </div>
     </div>
 
-    <% if (saved) { %><div class="notice notice-ok" style="margin-top:0;margin-bottom:18px">Settings saved.</div><% } %>
-    <% if (test) { %><div class="notice notice-ok" style="margin-top:0;margin-bottom:18px"><%= test %></div><% } %>
-    <% if (error) { %><div class="notice notice-bad" style="margin-top:0;margin-bottom:18px"><%= error %></div><% } %>
+    <% if (saved) { %><div class="notice notice-ok set-notice">Settings saved.</div><% } %>
+    <% if (test) { %><div class="notice notice-ok set-notice"><%= test %></div><% } %>
+    <% if (error) { %><div class="notice notice-bad set-notice"><%= error %></div><% } %>
 
-    <form method="post" action="/settings">
-      <div class="card">
+    <%# Each section is its own form with its own Save; the server only changes what was submitted. %>
+    <section class="set-section">
+      <div class="set-intro">
         <h2>Organisation</h2>
-        <div class="field" style="margin:14px 0 0">
+        <p>Shown to your team, on invitations, and to signers alongside the sender's name.</p>
+      </div>
+      <form method="post" action="/settings" class="card set-card">
+        <div class="field" style="margin:0">
           <label for="name">Name</label>
           <input id="name" name="name" type="text" value="<%= settings.name %>" required>
-          <p class="hint">Shown to your team, on invitations, and to signers alongside the sender's name.</p>
         </div>
-      </div>
+        <div class="set-foot">
+          <button class="btn btn-sm" type="submit">Save</button>
+        </div>
+      </form>
+    </section>
 
-      <div class="card">
+    <section class="set-section">
+      <div class="set-intro">
         <h2>Outgoing mail</h2>
-        <p class="hint">Every signing invitation, reminder, completion notice and team invitation from your organisation goes out through this.</p>
-        <div class="choice-cards" style="margin-top:12px">
+        <p>Every signing invitation, reminder, completion notice and team invitation from your organisation goes out through this.</p>
+        <span class="set-status set-status-<%= mailState.tone %>"><%= mailState.text %></span>
+      </div>
+      <form method="post" action="/settings" class="card set-card">
+        <div class="choice-cards">
           <label class="choice">
             <input type="radio" name="mail_source" value="platform" <%= !settings.smtp_host ? 'checked' : '' %>>
             <span><strong>Use <%= brand.name %> mail</strong><small>
@@ -36,34 +53,34 @@
           </label>
           <label class="choice">
             <input type="radio" name="mail_source" value="own" <%= settings.smtp_host ? 'checked' : '' %>>
-            <span><strong>Use our own mail server</strong><small>Mail comes from your own domain, e.g. noreply@yourschool.co.za.</small></span>
+            <span><strong>Use our own mail server</strong><small>Mail comes from your own domain, e.g. noreply@yourcompany.co.za.</small></span>
           </label>
         </div>
         <div class="own-mail">
           <%- include('partials/smtp-fields', { s: settings }) %>
         </div>
-      </div>
+        <div class="set-foot">
+          <span class="set-foot-note">The test goes to your own address using the saved settings.</span>
+          <button class="btn btn-ghost btn-sm" type="submit" formaction="/settings/test" formnovalidate <%= effective ? '' : 'disabled' %>>Send a test email</button>
+          <button class="btn btn-sm" type="submit">Save</button>
+        </div>
+      </form>
+    </section>
 
-      <div class="btn-row" style="margin-top:18px">
-        <button class="btn" type="submit">Save settings</button>
-        <button class="btn btn-ghost" type="submit" formaction="/settings/test" formnovalidate <%= effective ? '' : 'disabled' %>>Send a test email</button>
+    <section class="set-section">
+      <div class="set-intro">
+        <h2>Logo</h2>
+        <p>Printed at the top of every certificate your organisation seals, at the top of its emails and in the sidebar.</p>
+        <p>PNG or JPG up to 1 MB — a few hundred KB is plenty. A wide logo on a transparent background reads best.</p>
       </div>
-      <p class="hint">
-        <% if (!effective) { %>No mail account is in effect yet.
-        <% } else if (effective.source === 'company') { %>In effect: your own server, <%= effective.smtp_host %>.
-        <% } else { %>In effect: <%= brand.name %> mail.<% } %>
-        The test goes to your own address using the saved settings.
-      </p>
-    </form>
-
-    <%- include('partials/logo-card', { c: settings, base: '/settings' }) %>
+      <%- include('partials/logo-card', { c: settings, base: '/settings', intro: false }) %>
+    </section>
 
     <% if (settings.updated_at) { %>
-      <p class="hint" style="margin-top:16px">
-        Last changed <%= new Date(settings.updated_at).toLocaleString() %>. Changes are recorded in the
+      <p class="set-meta">
+        Last changed <%= new Date(settings.updated_at).toLocaleString() %> · every change is recorded in the
         <a href="/activity">activity log</a>.
       </p>
     <% } %>
-
   </div>
 <%- include('partials/shell-end') %>

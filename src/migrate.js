@@ -55,7 +55,7 @@ export function migrate(db, nowIso) {
   addColumn('companies', 'logo_updated_at', 'TEXT');
 
   // Templates are documents with status 'template': they reuse the stored PDF,
-  // the field table and the placer. Their recipients are roles ("Parent"),
+  // the field table and the placer. Their recipients are roles ("Client"),
   // with an empty email until the template is used.
   const docCols = columns(db, 'documents');
   if (!docCols.has('template_visibility')) db.exec(`ALTER TABLE documents ADD COLUMN template_visibility TEXT`);

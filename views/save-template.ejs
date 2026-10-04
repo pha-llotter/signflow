@@ -24,7 +24,7 @@
           <% recipients.forEach(function (r, i) { %>
             <div class="field">
               <label for="role_<%= r.id %>">Role <%= i + 1 %> <span style="font-weight:400;color:var(--text-3)">— was <%= r.name %></span></label>
-              <input id="role_<%= r.id %>" name="role_<%= r.id %>" type="text" value="Signer <%= i + 1 %>" placeholder="e.g. Parent">
+              <input id="role_<%= r.id %>" name="role_<%= r.id %>" type="text" value="Signer <%= i + 1 %>" placeholder="e.g. Client">
             </div>
           <% }); %>
         </div>

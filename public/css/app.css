@@ -996,6 +996,52 @@ body.no-scroll { display: flex; flex-direction: column; }
 /* Desktop has the top bar's search; this one only shows once that is hidden. */
 .doc-search { display: none; margin: 0 0 14px; width: 100%; }
 
+/* ------------------------------------------------------------ settings ---- */
+
+/* Each setting is a row: what it is and why on the left, the controls in a
+   card on the right with its own Save in a footer. Rows are divided by a rule
+   so the page reads as a list of separate decisions. */
+.settings-page { max-width: 1040px; }
+.set-notice { margin: 0 0 18px; }
+.set-section {
+  display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px 40px;
+  padding: 28px 0; border-top: 1px solid var(--border);
+}
+.set-section:first-of-type { border-top: 0; padding-top: 4px; }
+.set-intro h2 { margin: 0 0 6px; font-size: 15.5px; font-weight: 680; }
+.set-intro p { margin: 0 0 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-3); }
+.set-card { margin: 0; padding: 22px 24px; }
+.set-card > :first-child { margin-top: 0; }
+.set-card + .set-card { margin-top: 0; }
+
+/* The footer bar: Save always bottom-right, anything else to its left. */
+.set-foot {
+  display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px;
+  margin: 22px -24px -22px; padding: 14px 24px;
+  background: var(--surface-2); border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+.set-foot-note { margin-right: auto; font-size: 12.5px; color: var(--text-3); }
+
+.set-status {
+  display: inline-flex; align-items: center; gap: 7px; margin-top: 4px;
+  padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 650;
+}
+.set-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.set-status-ok { background: var(--ok-bg); color: var(--ok); }
+.set-status-warn { background: var(--warn-bg); color: var(--warn); }
+
+.set-meta { margin: 6px 0 0; padding-top: 18px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-3); }
+
+@media (max-width: 900px) {
+  .set-section { grid-template-columns: 1fr; gap: 14px; padding: 22px 0; }
+}
+@media (max-width: 760px) {
+  .set-card { padding: 17px 15px; }
+  .set-foot { margin: 18px -15px -17px; padding: 12px 15px; }
+  .set-foot-note { flex-basis: 100%; }
+}
+
 /* ------------------------------------------------------ locked sections ---- */
 
 /* A section that waits on an earlier one — recipients wait for the PDF. A
