@@ -246,10 +246,14 @@ try {
   }
 
   // --- the admin log -------------------------------------------------------
-  const finalTeam = await (await admin.req('GET', '/team')).text();
+  const activity = await (await admin.req('GET', '/activity')).text();
   for (const entry of ['Invitation sent', 'Account deactivated', 'Password reset issued']) {
-    check(`the administration log records "${entry}"`, finalTeam.includes(entry));
+    check(`the activity log records "${entry}"`, activity.includes(entry));
   }
+  // The session that signed back in after the account was restored — the
+  // original one was cut off by the deactivation, as it should be.
+  res = await restored.req('GET', '/activity');
+  check('a member cannot reach the activity log', res.status === 404, String(res.status));
 
   console.log(`\n${passed} passed, ${failed} failed\n`);
   ok = failed === 0;

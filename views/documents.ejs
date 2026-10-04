@@ -2,15 +2,9 @@
 <%- include('partials/shell-start') %>
 
 <%
-  const TABS = [
-    ['', 'All', total],
-    ['draft', 'Drafts', counts.draft || 0],
-    ['sent', 'Out for signature', counts.sent || 0],
-    ['completed', 'Completed', counts.completed || 0],
-    ['declined', 'Declined', counts.declined || 0],
-  ];
-  const tabHref = (s) => '/documents' + (s || q ? '?' + new URLSearchParams(Object.assign({}, s ? { status: s } : {}, q ? { q } : {})) : '');
-  const heading = status ? TABS.find((t) => t[0] === status)[1] : 'Documents';
+  // The sidebar picks the filter; the page just says which one it is showing.
+  const LABELS = { draft: 'Drafts', sent: 'Out for signature', completed: 'Completed', declined: 'Declined' };
+  const heading = status ? LABELS[status] : 'My Documents';
 %>
   <div class="wrap wrap-wide">
     <div class="page-head">
@@ -32,19 +26,11 @@
       <a class="btn" href="/documents/new">Send a document</a>
     </div>
 
-    <div class="doc-tools">
-      <nav class="tabs-line" aria-label="Filter by status">
-        <% TABS.forEach(function (t) { %>
-          <a href="<%= tabHref(t[0]) %>" class="<%= (status || '') === t[0] ? 'active' : '' %>"
-             <%= (status || '') === t[0] ? 'aria-current=page' : '' %>><%= t[1] %> <span class="tab-count"><%= t[2] %></span></a>
-        <% }); %>
-      </nav>
-      <%# The top bar's search is hidden on narrow screens, so this one stands in. %>
-      <form class="doc-search" method="get" action="/documents" role="search">
-        <% if (status) { %><input type="hidden" name="status" value="<%= status %>"><% } %>
-        <input type="search" name="q" value="<%= q %>" placeholder="Search documents…" aria-label="Search documents">
-      </form>
-    </div>
+    <%# The top bar's search is hidden on narrow screens, so this one stands in. %>
+    <form class="doc-search" method="get" action="/documents" role="search">
+      <% if (status) { %><input type="hidden" name="status" value="<%= status %>"><% } %>
+      <input type="search" name="q" value="<%= q %>" placeholder="Search documents…" aria-label="Search documents">
+    </form>
 
     <% if (!mailReady) { %>
       <div class="notice notice-warn" style="margin-top:0;margin-bottom:18px">

@@ -227,6 +227,30 @@ outside the project and must be kept as protected as the server itself.
 
 So: git to undo a change, a zip checkpoint to recover an installation.
 
+## Verification: public and in-app
+
+Verification exists twice and works identically — look up by document ID or any
+recorded hash, or upload a PDF and have it hashed and matched:
+
+- **Public** — `/` and `/verify/<id>`. No account. `/verify/<id>` is printed on every
+  certificate and encoded in QR fields, and the people following it (signers, a
+  bank, a parent) have no account, so it must never require one.
+- **In-app** — `/verification` and `/verification/<id>`. Signed-in only, inside the app
+  with the sidebar; it is where the sidebar's *Verify a document* goes.
+
+Both are mounted from the same handlers in `src/routes/verify.js`; only the frame
+and the form addresses differ.
+
+## Trash
+
+Deleting a document moves it to the **trash** first. It leaves every list and the
+dashboard, its signing links close, and it cannot be sent, reminded or edited — but
+nothing is removed, and **Restore** puts it back exactly as it was, links working
+again. Only from the trash can a document be deleted permanently, one at a time or
+with **Empty trash**; that removes its records, audit trail, PDFs and attachments.
+Both trips are written to the document's audit trail. A trashed sealed document
+still verifies until it is permanently deleted, because the evidence still exists.
+
 ## Accounts and roles
 
 The installation is **invitation-only**. Public sign-up exists for exactly one
@@ -293,7 +317,7 @@ person.
 ### Administration log
 
 Who was invited, promoted, deactivated or reset, and who changed the organisation's
-settings — shown at the bottom of `/team`, and only for the admin's own company. Kept in `admin_events`, separate from the
+settings — on the Activity log page (`/activity`, admins only), and only for the admin's own company. Kept in `admin_events`, separate from the
 per-document `audit_events`, so it survives the deletion of every document those
 people touched.
 

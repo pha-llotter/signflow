@@ -39,7 +39,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
               (SELECT COUNT(*) FROM recipients r WHERE r.document_id = d.id) AS recipient_count,
               (SELECT COUNT(*) FROM recipients r WHERE r.document_id = d.id AND r.status = 'signed') AS signed_count,
               (SELECT MAX(declined_at) FROM recipients r WHERE r.document_id = d.id) AS declined_at
-       FROM documents d WHERE d.owner_id = ? AND d.status != 'template'
+       FROM documents d WHERE d.owner_id = ? AND d.status != 'template' AND d.deleted_at IS NULL
        ORDER BY COALESCE(d.completed_at, d.sent_at, d.created_at) DESC`
     )
     .all(req.user.id);
@@ -62,6 +62,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
          AND r.status IN ('pending', 'viewed')
          AND r.token IS NOT NULL
          AND d.status = 'sent'
+         AND d.deleted_at IS NULL
          AND d.company_id = ?
          AND (d.expires_at IS NULL OR d.expires_at > ?)
        ORDER BY d.sent_at`

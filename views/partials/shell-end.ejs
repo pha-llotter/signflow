@@ -40,14 +40,16 @@
 
   // The account menu is a <details>, which opens without script; this only
   // closes it again on an outside click or Escape, as a menu is expected to.
+  // The same goes for the Create new menu in the sidebar.
   (function () {
-    var menu = document.querySelector('.user-menu');
-    if (!menu) return;
-    document.addEventListener('click', function (e) {
-      if (menu.open && !menu.contains(e.target)) menu.open = false;
-    });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && menu.open) { menu.open = false; menu.querySelector('summary').focus(); }
+    var menus = document.querySelectorAll('.user-menu, .create-menu');
+    menus.forEach(function (menu) {
+      document.addEventListener('click', function (e) {
+        if (menu.open && !menu.contains(e.target)) menu.open = false;
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && menu.open) { menu.open = false; menu.querySelector('summary').focus(); }
+      });
     });
   })();
 </script>

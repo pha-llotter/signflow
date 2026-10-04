@@ -10,7 +10,7 @@ const router = Router();
 const EDITABLE = ['draft', 'template'];
 
 router.get('/documents/:id/prepare', requireAuth, editableDocument, (req, res) => {
-  if (!EDITABLE.includes(req.doc.status)) return res.redirect(`/documents/${req.doc.id}`);
+  if (!EDITABLE.includes(req.doc.status) || req.doc.deleted_at) return res.redirect(`/documents/${req.doc.id}`);
   const recipients = db
     .prepare('SELECT * FROM recipients WHERE document_id = ? ORDER BY order_index')
     .all(req.doc.id);
@@ -33,6 +33,9 @@ router.get('/documents/:id/prepare', requireAuth, editableDocument, (req, res) =
  * request leave orphaned fields behind.
  */
 router.put('/api/documents/:id/fields', requireAuth, editableDocument, (req, res) => {
+  if (req.doc.deleted_at) {
+    return res.status(409).json({ error: 'This document is in the trash. Restore it to keep editing.' });
+  }
   if (!EDITABLE.includes(req.doc.status)) {
     return res.status(409).json({ error: 'This document has been sent and can no longer be edited.' });
   }

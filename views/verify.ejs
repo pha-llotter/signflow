@@ -1,13 +1,18 @@
 <%- include('partials/head', { title: 'Verify a document' }) %>
-<%- include('partials/pub-start') %>
+<%# The same page serves the public check and the in-app one; only the frame differs. %>
+<% if (inApp) { %><%- include('partials/shell-start') %><% } else { %><%- include('partials/pub-start') %><% } %>
 
   <div class="wrap" style="max-width:760px">
     <div class="page-head">
       <div>
         <h1>Verify a document</h1>
         <p class="sub">
-          Check a signed PDF against the seal we recorded when it was completed. No account needed —
-          don't take our word for it.
+          Check a signed PDF against the seal we recorded when it was completed.
+          <% if (inApp) { %>
+            Anyone outside can run the same check without an account at <a href="/" target="_blank" rel="noopener">the public verification page</a>.
+          <% } else { %>
+            No account needed — don't take our word for it.
+          <% } %>
         </p>
       </div>
     </div>
@@ -43,7 +48,7 @@
     <div class="card">
       <h2>Check a file</h2>
       <p class="hint">The file never leaves this server's memory — we hash it and throw it away.</p>
-      <form method="post" action="/check" enctype="multipart/form-data" style="margin-top:14px">
+      <form method="post" action="<%= uploadAction %>" enctype="multipart/form-data" style="margin-top:14px">
         <div class="field">
           <%- include('partials/dropzone', {
                 id: 'verify-input',
@@ -61,7 +66,7 @@
     <div class="card">
       <h2>Or look one up</h2>
       <p class="hint">Paste a document ID or any of the hashes printed on a certificate of completion.</p>
-      <form method="post" action="/" style="margin-top:14px">
+      <form method="post" action="<%= lookupAction %>" style="margin-top:14px">
         <div class="field"><input type="text" name="query" value="<%= query %>" placeholder="Document ID or SHA-256 hash" required></div>
         <button class="btn btn-ghost" type="submit">Look it up</button>
       </form>
@@ -152,4 +157,4 @@
 
 <script src="/static/js/dropzone.js?v=<%= v %>" defer></script>
 
-<%- include('partials/pub-end') %>
+<% if (inApp) { %><%- include('partials/shell-end') %><% } else { %><%- include('partials/pub-end') %><% } %>

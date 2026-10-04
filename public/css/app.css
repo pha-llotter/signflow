@@ -174,6 +174,26 @@ h1, h2, h3 { letter-spacing: -.011em; }
   box-shadow: 0 6px 16px var(--brand-ring), 0 1px 2px rgba(14, 20, 32, .08);
 }
 
+/* "Create new" opens a short menu of what to start, rather than going straight
+   to an upload — a template is as common a starting point as a blank PDF. */
+.create-menu { position: relative; }
+.create-menu > summary { list-style: none; cursor: pointer; user-select: none; }
+.create-menu > summary::-webkit-details-marker { display: none; }
+.create-menu > summary .chev { margin-left: auto; transition: transform .15s; }
+.create-menu[open] > summary .chev { transform: rotate(180deg); }
+.create-pop {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 60;
+  display: flex; flex-direction: column; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
+}
+.create-pop a {
+  display: block; padding: 10px 12px; border-radius: var(--r-sm);
+  font-size: 14.5px; font-weight: 550; color: var(--text);
+}
+.create-pop a small { display: block; font-size: 12px; font-weight: 400; color: var(--text-3); margin-top: 1px; }
+.create-pop a:hover { background: var(--surface-2); text-decoration: none; }
+
 .side-nav { display: flex; flex-direction: column; gap: 2px; padding: 4px 12px 12px; flex: 1; overflow-y: auto; }
 .side-sect {
   font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase;
@@ -790,7 +810,6 @@ body.no-scroll { display: flex; flex-direction: column; }
 
 .wrap-wide { max-width: 1320px; }
 
-.btn-lg { padding: 12px 22px; font-size: 15px; font-weight: 700; border-radius: var(--r); box-shadow: 0 6px 16px var(--brand-ring); }
 
 .banner {
   display: flex; align-items: center; gap: 16px;
@@ -896,7 +915,6 @@ body.no-scroll { display: flex; flex-direction: column; }
 }
 @media (max-width: 620px) {
   .dash-head { flex-direction: column; }
-  .dash-head .btn { width: 100%; }
   .hello { font-size: 24px; }
   .banner { flex-wrap: wrap; padding: 15px 16px; }
   .banner .btn { width: 100%; }
@@ -931,11 +949,10 @@ body.no-scroll { display: flex; flex-direction: column; }
 .tabs-line a.active { background: var(--brand-soft); color: var(--brand); }
 .tab-count { font-size: 12px; font-weight: 700; opacity: .75; font-variant-numeric: tabular-nums; }
 /* Desktop has the top bar's search; this one only shows once that is hidden. */
-.doc-search { display: none; margin: 0; width: 100%; }
+.doc-search { display: none; margin: 0 0 14px; width: 100%; }
 
 /* ------------------------------------------------------------ templates ---- */
 
-.btn-ghost.btn-lg { box-shadow: none; }
 
 .tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
 .tpl-grid .card + .card { margin-top: 0; }
@@ -991,7 +1008,15 @@ body.no-scroll { display: flex; flex-direction: column; }
 .side-nav.side-platform { flex: none; padding-top: 10px; border-top: 1px solid var(--border); }
 
 /* A company's own logo, beside its name and on its settings pages. */
-.side-org-logo { width: 26px; height: 26px; object-fit: contain; flex: none; border-radius: 4px; }
+/* Logos come in every shape; a wide wordmark squeezed into an icon-sized
+   square shrinks to a sliver. So the logo gets its own row, up to the width of
+   the sidebar, with the name beneath it. */
+.side-org-has-logo { flex-direction: column; align-items: flex-start; gap: 7px; }
+.side-org-logo { display: block; width: auto; height: auto; max-width: 100%; max-height: 44px; object-fit: contain; }
+.side-org-has-logo span { max-width: 100%; }
+/* Most logos are drawn for white paper; on the dark sidebar a dark wordmark
+   would disappear, so it sits on a paper-coloured backing there. */
+:root[data-theme="dark"] .side-org-logo { background: var(--paper); padding: 4px 6px; border-radius: 6px; }
 .logo-preview {
   display: flex; align-items: center; gap: 14px; margin-top: 14px; padding: 14px;
   /* Paper, not the themed surface: the logo is shown as it will print. */
@@ -1024,7 +1049,6 @@ body.no-scroll { display: flex; flex-direction: column; }
   .support-bar { padding: 9px 14px; gap: 6px; }
   .support-bar form { display: none; }
   .support-text { flex-basis: 100%; }
-  .dash-actions { width: 100%; }
 }
 
 /* The banner scrolls away with the page; this stays in the sticky top bar. */

@@ -1,0 +1,61 @@
+<%- include('partials/head', { title: 'Trash' }) %>
+<%- include('partials/shell-start') %>
+
+  <div class="wrap wrap-wide">
+    <div class="page-head">
+      <div>
+        <h1>Trash</h1>
+        <p class="sub">
+          Deleted documents wait here, with their signing links closed, until you restore them or delete them for good.
+        </p>
+      </div>
+      <div class="spacer"></div>
+      <% if (docs.length) { %>
+        <form method="post" action="/documents/trash/empty" class="inline"
+              onsubmit="return confirm('Permanently delete all <%= docs.length %> document<%= docs.length === 1 ? '' : 's' %> in the trash, with their PDFs and audit trails? This cannot be undone.')">
+          <button class="btn btn-danger" type="submit">Empty trash</button>
+        </form>
+      <% } %>
+    </div>
+
+    <div class="card" style="padding:14px 8px">
+      <% if (!docs.length) { %>
+        <div class="empty">
+          <p style="font-size:16px;margin:0 0 6px;color:var(--text-2)">The trash is empty.</p>
+          <p style="margin:0">Documents you delete come here first, so a mistake can be undone.</p>
+        </div>
+      <% } else { %>
+        <table>
+          <thead>
+            <tr><th>Document</th><th>Status</th><th>Signatures</th><th>Deleted</th><th></th></tr>
+          </thead>
+          <tbody>
+            <% docs.forEach(function (d) { %>
+              <tr>
+                <td class="td-primary">
+                  <a href="/documents/<%= d.id %>" style="font-weight:600;color:var(--text)"><%= d.title %></a>
+                  <div class="hint" style="margin:2px 0 0"><%= d.filename %> · <%= d.page_count %> page<%= d.page_count === 1 ? '' : 's' %></div>
+                </td>
+                <td data-label="Status"><span class="pill pill-<%= d.status %>"><%= d.status %></span></td>
+                <td data-label="Signed"><%= d.signed_count %> of <%= d.recipient_count %></td>
+                <td data-label="Deleted" class="hint"><%= new Date(d.deleted_at).toLocaleDateString() %></td>
+                <td class="td-action">
+                  <div class="btn-row" style="justify-content:flex-end;flex-wrap:nowrap">
+                    <form method="post" action="/documents/<%= d.id %>/restore" class="inline">
+                      <button class="btn btn-ghost btn-sm" type="submit">Restore</button>
+                    </form>
+                    <form method="post" action="/documents/<%= d.id %>/purge" class="inline"
+                          onsubmit="return confirm('Permanently delete “<%= d.title.replace(/'/g, '') %>”, its PDFs and its audit trail? This cannot be undone.')">
+                      <button class="btn btn-danger btn-sm" type="submit">Delete permanently</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </div>
+
+<%- include('partials/shell-end') %>

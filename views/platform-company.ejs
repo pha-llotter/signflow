@@ -185,15 +185,6 @@
     </div>
   </div>
 
-<script>
-  document.querySelectorAll('.copy-link').forEach((b) => {
-    b.addEventListener('click', async () => {
-      await navigator.clipboard.writeText(b.dataset.link);
-      const was = b.textContent;
-      b.textContent = 'Copied';
-      setTimeout(() => { b.textContent = was; }, 1400);
-    });
-  });
-</script>
+<script src="/static/js/copy-link.js?v=<%= v %>" defer></script>
 
 <%- include('partials/shell-end') %>

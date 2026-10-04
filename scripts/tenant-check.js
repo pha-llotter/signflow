@@ -94,10 +94,11 @@ try {
   check('a company admin cannot open the platform pages', (await head('GET', '/platform')).status === 404 && (await head('GET', `/platform/companies/${protea.id}`)).status === 404);
   check('...or create a company', (await head('POST', '/platform/companies', form({ name: 'Sneaky', admin_email: 's@s.test' }))).status === 404 && !db.prepare(`SELECT 1 FROM companies WHERE name='Sneaky'`).get());
   const rTeam = await text(head, '/team');
-  const people = rTeam.split('Administration log')[0];
+  const rLog = await text(head, '/activity');
+  const people = rTeam;
   check('Team shows only their own people', people.includes('head@riverside.test') && !people.includes('luan@protea.test'));
-  check('their log does record the platform owner inviting them', rTeam.split('Administration log')[1].includes('Invitation sent'));
-  check('...and only their own administration log', !rTeam.includes('Platform created') && !rTeam.includes('luan@protea.test —'));
+  check('their activity log records the platform owner inviting them', rLog.includes('Invitation sent'));
+  check('...and only their own activity', !rLog.includes('Platform created') && !rLog.includes('Company created'));
   await head('POST', `/team/user/${luan.id}/role`, form({ role: 'member' }));
   await head('POST', `/team/user/${luan.id}/status`, form({ status: 'suspended' }));
   await head('POST', `/team/user/${luan.id}/reset`);
@@ -272,6 +273,76 @@ try {
   await head3('POST', '/settings/logo/remove');
   check('removing it clears the record and deletes the file', !rLogo().logo_path && !fs.existsSync(oldPath));
 
+  console.log('\ntrash');
+  const docRow = (id) => db.prepare('SELECT * FROM documents WHERE id = ?').get(id);
+  const t1 = await sendDoc(head3, 'Trash me', 'Parent Four', 'p4@riverside.test');
+  const t1files = [docRow(t1.id).original_path];
+  res = await head3('POST', `/documents/${t1.id}/delete`);
+  check('deleting moves a document to the trash, keeping it and its files', loc(res) === '/documents' && !!docRow(t1.id)?.deleted_at && t1files.every((p) => fs.existsSync(p)));
+  // The first page after deleting carries the "moved to the trash" notice,
+  // which names the document; the list itself is what must not.
+  check('...it leaves My Documents and the dashboard', !(await text(head3, '/documents')).includes('>Trash me</a>') && !(await text(head3, '/dashboard')).includes('Trash me</strong>'));
+  check('...and shows in Trash with Restore and Delete permanently', ((await text(head3, '/documents/trash')).match(/Trash me|\/restore|\/purge/g) || []).length >= 3);
+  res = await fetch(`${BASE}/sign/${t1.tok}`);
+  check('its signing link is closed while it is in the trash', res.status === 410 && (await res.text()).includes('no longer available'));
+  check('it cannot be sent, reminded or edited from the trash',
+    (await head3('POST', `/documents/${t1.id}/remind`)).status === 302 &&
+    loc(await head3('GET', `/documents/${t1.id}/prepare`)) === `/documents/${t1.id}` &&
+    (await head3('PUT', `/api/documents/${t1.id}/fields`, { headers: { 'content-type': 'application/json' }, body: '{"fields":[]}' })).status === 409);
+
+  check('another company cannot trash, restore or purge it',
+    (await owner('POST', `/documents/${t1.id}/restore`)).status === 404 &&
+    (await owner('POST', `/documents/${t1.id}/purge`)).status === 404 &&
+    !!docRow(t1.id)?.deleted_at);
+
+  await head3('POST', `/documents/${t1.id}/restore`);
+  check('restore brings it back exactly as it was', !docRow(t1.id).deleted_at && docRow(t1.id).status === 'sent' && (await text(head3, '/documents')).includes('Trash me'));
+  check('...with its signing link working again', (await fetch(`${BASE}/sign/${t1.tok}`)).status === 200);
+  const trail = db.prepare('SELECT action FROM audit_events WHERE document_id = ?').all(t1.id).map((e) => e.action);
+  check('the audit trail records the trip to the trash and back', trail.includes('Moved to trash') && trail.includes('Restored from trash'));
+
+  await head3('POST', `/documents/${t1.id}/purge`);
+  check('permanent deletion is refused for a document not in the trash', !!docRow(t1.id));
+  await head3('POST', `/documents/${t1.id}/delete`);
+  res = await head3('POST', `/documents/${t1.id}/purge`);
+  check('from the trash it deletes for good: record and files', loc(res) === '/documents/trash' && !docRow(t1.id) && t1files.every((p) => !fs.existsSync(p)));
+
+  const t2 = await sendDoc(head3, 'Trash two', 'P5', 'p5@riverside.test');
+  const t3 = await sendDoc(head3, 'Trash three', 'P6', 'p6@riverside.test');
+  const keep = await sendDoc(owner, 'Protea keeps this', 'P7', 'p7@protea.test');
+  await head3('POST', `/documents/${t2.id}/delete`);
+  await head3('POST', `/documents/${t3.id}/delete`);
+  await owner('POST', `/documents/${keep.id}/delete`);
+  await head3('POST', '/documents/trash/empty');
+  check('Empty trash removes everything in your trash', !docRow(t2.id) && !docRow(t3.id));
+  check('...and nothing in anyone else\'s', !!docRow(keep.id)?.deleted_at);
+
+  console.log('\nverification: public and in-app');
+  const sealedBytes = fs.readFileSync(db.prepare('SELECT sealed_path FROM documents WHERE id = ?').get(branded.id).sealed_path);
+  const pdfUpload = (url, s) => {
+    const fd = new FormData();
+    fd.append('pdf', new Blob([sealedBytes], { type: 'application/pdf' }), 'sealed.pdf');
+    return s ? s('POST', url, { body: fd }) : fetch(BASE + url, { method: 'POST', body: fd });
+  };
+  let page = await (await fetch(`${BASE}/`)).text();
+  check('the public page needs no account and has no app sidebar', page.includes('Verify a document') && !page.includes('class="sidebar"'));
+  page = await (await fetch(`${BASE}/verify/${branded.id}`)).text();
+  check('the link printed on certificates still works for anyone', page.includes('Branded certificate'));
+  page = await (await pdfUpload('/check')).text();
+  check('a public upload check confirms the sealed file', /sealed document exactly as it was issued/.test(page));
+
+  res = await fetch(`${BASE}/verification`, { redirect: 'manual' });
+  check('the in-app page requires signing in', res.status === 302 && loc(res).startsWith('/login'));
+  page = await text(head3, '/verification');
+  check('signed in, it sits inside the app with the sidebar', page.includes('class="sidebar"') && page.includes('action="/verification"') && page.includes('action="/verification/upload"'));
+  check('...and the sidebar\'s Verify link points to it', page.includes('href="/verification" class="active"'));
+  page = await (await head3('POST', '/verification', form({ query: branded.id }))).text();
+  check('in-app lookup by ID gives the same result', page.includes('Branded certificate') && page.includes('class="sidebar"'));
+  page = await (await pdfUpload('/verification/upload', head3)).text();
+  check('in-app upload check gives the same result', /sealed document exactly as it was issued/.test(page) && page.includes('class="sidebar"'));
+  page = await text(head3, `/verification/${branded.id}`);
+  check('in-app link by ID works too', page.includes('Branded certificate') && page.includes('class="sidebar"'));
+
   console.log('\ndeleting a company');
   await owner('POST', '/platform/companies', form({ name: 'Doomed Ltd', admin_email: 'boss@doomed.test' }));
   const doomed = db.prepare(`SELECT * FROM companies WHERE name='Doomed Ltd'`).get();
@@ -338,6 +409,12 @@ try {
   const sendsHome = async (url) => loc(await ops('GET', url)) === '/platform';
   check('company pages send them to the platform instead',
     (await sendsHome('/dashboard')) && (await sendsHome('/documents')) && (await sendsHome('/templates')) && (await sendsHome('/team')) && (await sendsHome('/settings')) && (await sendsHome('/documents/new')));
+  res = await ops('PUT', `/api/documents/${helped.id}/fields`, { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fields: [] }) });
+  const apiBody = await res.json().catch(() => null);
+  check('the placer\'s save API answers them with an explanation, not a redirect', res.status === 403 && /not in a company/.test(apiBody?.error || ''), `${res.status} ${JSON.stringify(apiBody)}`);
+  res = await session()('PUT', `/api/documents/${helped.id}/fields`, { headers: { 'content-type': 'application/json' }, body: '{"fields":[]}' });
+  check('...and a signed-out save gets a 401 it can show', res.status === 401 && !!(await res.json().catch(() => null))?.error);
+  check('they can use in-app verification too', (await ops('GET', '/verification')).status === 200);
   check('their profile and the platform pages open', (await ops('GET', '/profile')).status === 200 && (await ops('GET', '/platform')).status === 200);
   const opsShell = await text(ops, '/platform');
   check('their sidebar has no company navigation', !opsShell.includes('href="/documents/new"') && !opsShell.includes('href="/templates"') && !opsShell.includes('action="/documents"'));

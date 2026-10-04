@@ -76,6 +76,11 @@ try {
 
   browser = await chromium.launch({ channel: 'msedge', headless: true });
   const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+  // This suite talks to 127.0.0.1, which browsers count as a secure context.
+  // People reach the app over a plain-http LAN address, which is not — and
+  // there secure-only APIs such as crypto.randomUUID simply do not exist. Taking
+  // it away here keeps the placer honest about that; it once broke every drop.
+  await ctx.addInitScript(() => { delete Crypto.prototype.randomUUID; });
   const page = await ctx.newPage();
 
   // Any uncaught console error in the placer or signing page is a failure —
@@ -286,6 +291,30 @@ try {
   await page.click('#save-btn');
   await page.waitForFunction(() => document.getElementById('save-state').textContent === 'All changes saved', null, { timeout: 8000 });
   check('fields autosaved to the server', true);
+
+  // In a window under ~1040px the palette is a drawer over a scrim. A mouse
+  // drag from it used to drop onto the scrim and vanish — a desktop window
+  // that is not maximised, or zoomed, is that narrow. Raw mouse events, so
+  // nothing about the overlay is skipped the way a person would not skip it.
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.waitForTimeout(400);
+  await page.click('#toggle-palette');
+  await page.waitForTimeout(300);
+  const fieldsBefore = await page.locator('.fld').count();
+  const chipBox = await page.locator('.chip[data-type="name"]').boundingBox();
+  const pageBox = await page.locator('.pdf-page').first().boundingBox();
+  await page.mouse.move(chipBox.x + chipBox.width / 2, chipBox.y + chipBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(pageBox.x + pageBox.width * 0.6, pageBox.y + pageBox.height * 0.2, { steps: 12 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  check('a mouse drag from the drawer palette places a field in a narrow window',
+    (await page.locator('.fld').count()) === fieldsBefore + 1,
+    `${fieldsBefore} → ${await page.locator('.fld').count()}`);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.waitForTimeout(400);
+  await page.click('#save-btn');
+  await page.waitForFunction(() => document.getElementById('save-state').textContent === 'All changes saved', null, { timeout: 8000 });
 
   await page.screenshot({ path: path.join(OUT, '1-placer.png'), fullPage: false });
 

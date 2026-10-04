@@ -131,40 +131,8 @@
       </table>
     </div>
 
-    <div class="card">
-      <h2>Administration log</h2>
-      <p class="hint">
-        Who was invited, promoted or deactivated, and who changed the organisation's settings. Kept separately
-        from document audit trails so it survives the deletion of every document those people touched.
-      </p>
-      <% if (!events.length) { %>
-        <p class="hint" style="margin-top:14px">Nothing recorded yet.</p>
-      <% } else { %>
-        <ul class="audit" style="margin-top:14px">
-          <% events.forEach(function (e) { %>
-            <li>
-              <time><%= new Date(e.created_at).toLocaleString() %></time>
-              <div>
-                <span class="who"><%= e.actor_email %></span> — <%= e.action %><% if (e.subject) { %>: <%= e.subject %><% } %>
-                <% if (e.detail) { %><span class="det"><%= e.detail %></span><% } %>
-                <span class="det"><%= e.ip || 'no IP recorded' %></span>
-              </div>
-            </li>
-          <% }); %>
-        </ul>
-      <% } %>
-    </div>
   </div>
 
-<script>
-  document.querySelectorAll('.copy-link').forEach((b) => {
-    b.addEventListener('click', async () => {
-      await navigator.clipboard.writeText(b.dataset.link);
-      const was = b.textContent;
-      b.textContent = 'Copied';
-      setTimeout(() => { b.textContent = was; }, 1400);
-    });
-  });
-</script>
+<script src="/static/js/copy-link.js?v=<%= v %>" defer></script>
 
 <%- include('partials/shell-end') %>

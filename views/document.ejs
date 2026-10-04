@@ -13,7 +13,9 @@
       </div>
       <div class="spacer"></div>
       <div class="btn-row">
-        <% if (doc.status === 'draft') { %>
+        <% if (doc.deleted_at) { %>
+          <%# Nothing can be sent, reminded or edited from the trash. %>
+        <% } else if (doc.status === 'draft') { %>
           <a class="btn btn-ghost" href="/documents/<%= doc.id %>/prepare">Edit fields</a>
           <form method="post" action="/documents/<%= doc.id %>/send" class="inline">
             <button class="btn" type="submit">Send for signature</button>
@@ -25,9 +27,25 @@
         <% } else if (doc.status === 'completed') { %>
           <a class="btn" href="/documents/<%= doc.id %>/signed.pdf">Download sealed PDF</a>
         <% } %>
-        <a class="btn btn-ghost" href="/documents/<%= doc.id %>/save-template">Save as template</a>
+        <% if (!doc.deleted_at) { %><a class="btn btn-ghost" href="/documents/<%= doc.id %>/save-template">Save as template</a><% } %>
       </div>
     </div>
+
+    <% if (doc.deleted_at) { %>
+      <div class="notice notice-warn" style="margin-top:0;margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="flex:1;min-width:220px">
+          <strong>This document is in the trash</strong> (since <%= new Date(doc.deleted_at).toLocaleDateString() %>).
+          Its signing links are closed until you restore it.
+        </span>
+        <form method="post" action="/documents/<%= doc.id %>/restore" class="inline">
+          <button class="btn btn-sm" type="submit">Restore</button>
+        </form>
+        <form method="post" action="/documents/<%= doc.id %>/purge" class="inline"
+              onsubmit="return confirm('Permanently delete this document, its PDFs and its audit trail? This cannot be undone.')">
+          <button class="btn btn-danger btn-sm" type="submit">Delete permanently</button>
+        </form>
+      </div>
+    <% } %>
 
     <% if (doc.status === 'completed') { %>
       <div class="card">
@@ -71,7 +89,7 @@
               <td data-label="Opened" class="hint"><%= r.viewed_at ? new Date(r.viewed_at).toLocaleString() : '—' %></td>
               <td data-label="Signed" class="hint"><%= r.signed_at ? new Date(r.signed_at).toLocaleString() : '—' %></td>
               <td data-label="Link">
-                <% if (r.token && r.status !== 'signed' && doc.status === 'sent') { %>
+                <% if (r.token && r.status !== 'signed' && doc.status === 'sent' && !doc.deleted_at) { %>
                   <button class="link-btn copy-link" data-link="<%= baseUrl %>/sign/<%= r.token %>">Copy link</button>
                 <% } else { %>
                   <span class="hint">—</span>
@@ -100,25 +118,17 @@
       </ul>
     </div>
 
-    <div class="card">
-      <h2>Danger zone</h2>
-      <p class="hint">Deleting removes the stored PDFs and the whole audit trail. It cannot be undone.</p>
-      <form method="post" action="/documents/<%= doc.id %>/delete" style="margin-top:12px"
-            onsubmit="return confirm('Delete this document, its PDFs and its audit trail permanently?')">
-        <button class="btn btn-danger btn-sm" type="submit">Delete document</button>
-      </form>
-    </div>
+    <% if (!doc.deleted_at) { %>
+      <div class="card">
+        <h2>Delete</h2>
+        <p class="hint">Moves the document to the trash and closes its signing links. You can restore it from the trash, or delete it permanently there.</p>
+        <form method="post" action="/documents/<%= doc.id %>/delete" style="margin-top:12px">
+          <button class="btn btn-danger btn-sm" type="submit">Move to trash</button>
+        </form>
+      </div>
+    <% } %>
   </div>
 
-<script>
-  document.querySelectorAll('.copy-link').forEach((b) => {
-    b.addEventListener('click', async () => {
-      await navigator.clipboard.writeText(b.dataset.link);
-      const was = b.textContent;
-      b.textContent = 'Copied';
-      setTimeout(() => { b.textContent = was; }, 1400);
-    });
-  });
-</script>
+<script src="/static/js/copy-link.js?v=<%= v %>" defer></script>
 
 <%- include('partials/shell-end') %>

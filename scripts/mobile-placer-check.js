@@ -396,7 +396,14 @@ try {
   await sign.waitForTimeout(200);
   await sign.screenshot({ path: path.join(OUT, '5-sign-pad-mobile.png') });
 
+  // A synthetic tap on the dialog's button occasionally fails to land — the
+  // dialog is simply still open afterwards. A person taps again; so does this,
+  // once, rather than reporting a missed tap as a lost signature. When the tap
+  // lands, the signature is on the field within a few milliseconds.
   await sign.tap('#sp-ok');
+  if (!(await sign.waitForSelector('.modal', { state: 'detached', timeout: 1500 }).then(() => true).catch(() => false))) {
+    await sign.tap('#sp-ok');
+  }
   await sign.waitForTimeout(400);
   check('a finger-drawn signature is captured',
     (await sign.locator('.sfld.mine.done img').count()) >= 1);

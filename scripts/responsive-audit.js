@@ -270,6 +270,8 @@ try {
     // is where that is asserted.
     ['dashboard', `${BASE}/dashboard`, page],
     ['documents', `${BASE}/documents`, page],
+    ['trash', `${BASE}/documents/trash`, page],
+    ['verification', `${BASE}/verification`, page],
     ['templates', `${BASE}/templates`, page],
     ['template-new', `${BASE}/templates/new`, page],
     ['platform', `${BASE}/platform`, page],
@@ -278,6 +280,7 @@ try {
     ['document', `${BASE}/documents/${docId}`, page],
     ['settings', `${BASE}/settings`, page],
     ['team', `${BASE}/team`, page],
+    ['activity', `${BASE}/activity`, page],
     ['profile', `${BASE}/profile`, page],
     ['invite', `${BASE}/invite/${inviteToken}`, anon],
     ['verify', `${BASE}/verify/${docId}`, anon],

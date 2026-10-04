@@ -39,6 +39,10 @@ export function migrate(db, nowIso) {
   // Denormalised from the owner so team templates and company-wide queries do
   // not have to join through users for every row.
   addColumn('documents', 'company_id', 'TEXT');
+  // Deleting a document moves it to the trash first; only emptying the trash
+  // removes it. deleted_at set means "in the trash".
+  addColumn('documents', 'deleted_at', 'TEXT');
+  addColumn('documents', 'deleted_by', 'TEXT');
   // A company's own logo, for its certificates, emails and sidebar. Pixel size
   // is kept so layouts can be computed without decoding the image each time.
   addColumn('companies', 'logo_path', 'TEXT');

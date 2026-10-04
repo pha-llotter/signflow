@@ -47,7 +47,7 @@ router.get('/documents', requireAuth, (req, res) => {
               (SELECT COUNT(*) FROM recipients r WHERE r.document_id = d.id) AS recipient_count,
               (SELECT COUNT(*) FROM recipients r WHERE r.document_id = d.id AND r.status = 'signed') AS signed_count,
               (SELECT group_concat(name || ' ' || email, ' ') FROM recipients r WHERE r.document_id = d.id) AS recipient_text
-       FROM documents d WHERE d.owner_id = ? AND d.status != 'template' ORDER BY d.created_at DESC`
+       FROM documents d WHERE d.owner_id = ? AND d.status != 'template' AND d.deleted_at IS NULL ORDER BY d.created_at DESC`
     )
     .all(req.user.id);
 
@@ -150,6 +150,79 @@ router.post('/documents/new', requireAuth, receivePdf, async (req, res, next) =>
   }
 });
 
+/* ------------------------------------------------------------------ trash */
+
+/**
+ * Deleting is two steps. A document first goes to the trash — out of every
+ * list, its signing links closed — where it can be restored exactly as it was.
+ * Only from the trash can it be deleted for good, and only that removes the
+ * records and the files. A misclick on a signed contract should never be the
+ * end of it.
+ */
+function trashed(ownerId) {
+  return db
+    .prepare(
+      `SELECT d.*,
+              (SELECT COUNT(*) FROM recipients r WHERE r.document_id = d.id) AS recipient_count,
+              (SELECT COUNT(*) FROM recipients r WHERE r.document_id = d.id AND r.status = 'signed') AS signed_count
+       FROM documents d
+       WHERE d.owner_id = ? AND d.status != 'template' AND d.deleted_at IS NOT NULL
+       ORDER BY d.deleted_at DESC`
+    )
+    .all(ownerId);
+}
+
+/** Removes a document for good: its rows (recipients, fields, audit trail cascade) and every file it owns. */
+function purge(doc) {
+  const files = [
+    doc.original_path,
+    doc.sealed_path,
+    ...db.prepare('SELECT path FROM attachments WHERE document_id = ?').all(doc.id).map((a) => a.path),
+  ].filter(Boolean);
+  db.prepare('DELETE FROM documents WHERE id = ?').run(doc.id);
+  for (const p of files) fs.rmSync(p, { force: true });
+}
+
+router.get('/documents/trash', requireAuth, (req, res) => {
+  res.render('trash', { docs: trashed(req.user.id) });
+});
+
+router.post('/documents/trash/empty', requireAuth, (req, res) => {
+  const docs = trashed(req.user.id);
+  for (const d of docs) purge(d);
+  req.session.flash = { type: 'ok', text: docs.length ? `${docs.length} document${docs.length === 1 ? '' : 's'} permanently deleted.` : 'The trash was already empty.' };
+  res.redirect('/documents/trash');
+});
+
+router.post('/documents/:id/delete', requireAuth, ownedDocument, (req, res) => {
+  if (!req.doc.deleted_at) {
+    db.prepare('UPDATE documents SET deleted_at = ?, deleted_by = ? WHERE id = ?').run(nowIso(), req.user.id, req.doc.id);
+    audit({ documentId: req.doc.id, actor: req.user.email, action: 'Moved to trash', req });
+  }
+  req.session.flash = { type: 'ok', text: `“${req.doc.title}” moved to the trash. You can restore it from there.` };
+  res.redirect('/documents');
+});
+
+router.post('/documents/:id/restore', requireAuth, ownedDocument, (req, res) => {
+  if (req.doc.deleted_at) {
+    db.prepare('UPDATE documents SET deleted_at = NULL, deleted_by = NULL WHERE id = ?').run(req.doc.id);
+    audit({ documentId: req.doc.id, actor: req.user.email, action: 'Restored from trash', req });
+  }
+  req.session.flash = { type: 'ok', text: `“${req.doc.title}” restored.` };
+  res.redirect(`/documents/${req.doc.id}`);
+});
+
+/** Permanent — and refused for anything not already in the trash. */
+router.post('/documents/:id/purge', requireAuth, ownedDocument, (req, res) => {
+  if (!req.doc.deleted_at) {
+    req.session.flash = { type: 'error', text: 'Move a document to the trash before deleting it permanently.' };
+    return res.redirect(`/documents/${req.doc.id}`);
+  }
+  purge(req.doc);
+  req.session.flash = { type: 'ok', text: `“${req.doc.title}” permanently deleted.` };
+  res.redirect('/documents/trash');
+});
+
 router.get('/documents/:id', requireAuth, ownedDocument, (req, res) => {
   const recipients = db
     .prepare('SELECT * FROM recipients WHERE document_id = ? ORDER BY order_index')
@@ -166,6 +239,9 @@ router.get('/documents/:id', requireAuth, ownedDocument, (req, res) => {
  * to show and where to go next.
  */
 export async function sendDocument({ doc, user, req }) {
+  if (doc.deleted_at) {
+    return { flash: { type: 'error', text: 'This document is in the trash. Restore it before sending.' }, to: `/documents/${doc.id}` };
+  }
   if (doc.status !== 'draft') {
     return { flash: { type: 'error', text: 'This document has already been sent.' }, to: `/documents/${doc.id}` };
   }
@@ -240,7 +316,7 @@ export async function inviteRecipient({ doc, recipient, sender, req = null }) {
 router.post('/documents/:id/remind', requireAuth, ownedDocument, async (req, res) => {
   // A draft has not been sent, so there is nothing to remind anyone about —
   // and inviting from here would send it without going through Send.
-  if (req.doc.status !== 'sent') return res.redirect(`/documents/${req.doc.id}`);
+  if (req.doc.status !== 'sent' || req.doc.deleted_at) return res.redirect(`/documents/${req.doc.id}`);
   const pending = db
     .prepare(`SELECT * FROM recipients WHERE document_id = ? AND status IN ('pending','viewed') ORDER BY order_index`)
     .all(req.doc.id);
@@ -274,13 +350,5 @@ router.get('/documents/:id/signed.pdf', requireAuth, ownedDocument, (req, res) =
   res.type('application/pdf').sendFile(path.resolve(req.doc.sealed_path));
 });
 
-router.post('/documents/:id/delete', requireAuth, ownedDocument, (req, res) => {
-  for (const p of [req.doc.original_path, req.doc.sealed_path]) {
-    if (p && fs.existsSync(p)) fs.unlinkSync(p);
-  }
-  db.prepare('DELETE FROM documents WHERE id = ?').run(req.doc.id);
-  req.session.flash = { type: 'ok', text: 'Document deleted.' };
-  res.redirect('/documents');
-});
 
 export default router;

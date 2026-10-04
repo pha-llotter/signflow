@@ -186,6 +186,12 @@ document.querySelectorAll('.chip').forEach((chip) => {
   chip.addEventListener('dragstart', (e) => {
     e.dataTransfer.setData('text/plain', chip.dataset.type);
     e.dataTransfer.effectAllowed = 'copy';
+    // In a narrower window the palette is a drawer over a scrim, and the scrim
+    // would take the drop instead of the page — the field silently goes
+    // nowhere. Once a drag is under way the drawer has done its job, so it gets
+    // out of the way. Deferred a tick: Chrome cancels a drag whose source moves
+    // during dragstart itself.
+    if (palette.classList.contains('open')) setTimeout(closeDrawers, 0);
   });
 });
 
@@ -199,6 +205,22 @@ el.pages.addEventListener('drop', (e) => {
   e.preventDefault();
   placeField(e.dataTransfer.getData('text/plain'), holder, e.clientX, e.clientY);
 });
+
+/**
+ * A version-4 UUID for a new field. crypto.randomUUID() exists only in a
+ * secure context — HTTPS or localhost — so on a plain-http LAN address such as
+ * http://172.16.0.22 it is undefined, and calling it threw inside the drop
+ * handler: every field dropped vanished without a word. getRandomValues has no
+ * such restriction and gives the same format the server checks for.
+ */
+function newId() {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
 
 /** Creates a field centred on a point, in page-relative fractions. */
 function placeField(type, holder, clientX, clientY) {
@@ -218,7 +240,7 @@ function placeField(type, holder, clientX, clientY) {
   ({ px, py } = snapPx(px, py));
 
   const field = normalise({
-    id: crypto.randomUUID(),
+    id: newId(),
     type,
     recipient_id: spec.fill === 'author' ? null : state.activeRecipient,
     page: Number(holder.dataset.page),
@@ -274,13 +296,17 @@ function renderGuidance() {
 
 document.getElementById('banner-cancel').addEventListener('click', () => armType(null));
 
-const COARSE_POINTER = window.matchMedia?.('(pointer: coarse)').matches;
+// Touch-only means no mouse or trackpad at all. "(pointer: coarse)" alone is
+// not that: it describes the *primary* pointer, and Chrome on a touchscreen
+// Windows laptop can report touch as primary while the person is holding a
+// mouse — which switched drag-and-drop off for them entirely.
+const TOUCH_ONLY = !!window.matchMedia && !window.matchMedia('(any-pointer: fine)').matches;
 
 document.querySelectorAll('.chip').forEach((chip) => {
   // HTML5 drag-and-drop does not exist on touch, and leaving the attribute on
   // only gives the browser an excuse to treat a press as the start of a native
-  // drag instead of a tap.
-  if (COARSE_POINTER) chip.removeAttribute('draggable');
+  // drag instead of a tap. Click-to-place below works everywhere regardless.
+  if (TOUCH_ONLY) chip.removeAttribute('draggable');
 
   chip.addEventListener('click', () => {
     armType(state.armedType === chip.dataset.type ? null : chip.dataset.type);
@@ -646,7 +672,11 @@ async function save() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields: state.fields }),
     });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
+    // Only the server's own confirmation counts. A redirect that fetch
+    // followed to some HTML page is a 200 too, and used to read as saved.
+    if (res.redirected || !body?.ok) throw new Error('the server did not confirm the save. Reload the page.');
     state.dirty = false;
     renderSaveState();
   } catch (err) {
@@ -690,3 +720,40 @@ window.addEventListener('resize', () => {
 
 lastFit = fitWidth();
 renderPdf();
+
+/* ------------------------------------------------------------ diagnostics */
+
+// ?debug on the placer's address shows what this browser reports and logs each
+// drag event as it happens, so a "dragging does nothing" report can be read
+// off the screen instead of guessed at. Nothing is sent anywhere.
+if (new URLSearchParams(location.search).has('debug')) {
+  const box = document.createElement('pre');
+  box.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:9999;max-width:min(560px,94vw);max-height:42vh;overflow:auto;' +
+    'margin:0;padding:10px 12px;background:#0e1420;color:#e8ebf1;font:12px/1.45 ui-monospace,Consolas,monospace;' +
+    'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);white-space:pre-wrap;pointer-events:none';
+  const mq = (q) => (window.matchMedia ? window.matchMedia(q).matches : 'n/a');
+  const lines = [
+    `window ${innerWidth}×${innerHeight} · zoom/dpr ${devicePixelRatio}`,
+    `pointer:coarse ${mq('(pointer: coarse)')} · any-pointer:fine ${mq('(any-pointer: fine)')} · touch points ${navigator.maxTouchPoints}`,
+    `touch-only mode ${TOUCH_ONLY} · chips draggable ${document.querySelector('.chip')?.getAttribute('draggable')}`,
+    `palette as drawer ${getComputedStyle(document.getElementById('toggle-palette')).display !== 'none'}`,
+    `${navigator.userAgent}`,
+    '— events —',
+  ];
+  const render = () => { box.textContent = lines.slice(-40).join('\n'); };
+  const log = (msg) => { lines.push(`${(performance.now() / 1000).toFixed(2)}s ${msg}`); render(); };
+  const where = (e) => {
+    const t = e.target;
+    return `${t.tagName?.toLowerCase()}${t.className && typeof t.className === 'string' ? '.' + t.className.split(' ')[0] : ''}`;
+  };
+  let overs = 0;
+  document.addEventListener('dragstart', (e) => log(`dragstart on ${where(e)}`), true);
+  document.addEventListener('dragenter', (e) => log(`dragenter ${where(e)}`), true);
+  document.addEventListener('dragover', (e) => { if (overs++ % 25 === 0) log(`dragover ${where(e)} (accepted: ${e.defaultPrevented})`); }, true);
+  document.addEventListener('drop', (e) => log(`drop on ${where(e)}`), true);
+  document.addEventListener('dragend', (e) => log(`dragend · dropEffect ${e.dataTransfer?.dropEffect}`), true);
+  document.addEventListener('pointerdown', (e) => log(`pointerdown (${e.pointerType}) on ${where(e)}`), true);
+  window.addEventListener('error', (e) => log(`ERROR ${e.message}`));
+  document.body.appendChild(box);
+  render();
+}

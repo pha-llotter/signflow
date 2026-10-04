@@ -21,11 +21,20 @@
 
     <% if (inCompany) { %>
     <div class="side-cta">
-      <a class="btn btn-create" href="/documents/new">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
-             stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
-        Send a document
-      </a>
+      <details class="create-menu">
+        <summary class="btn btn-create">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+               stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          Create new
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+        </summary>
+        <div class="create-pop">
+          <a href="/documents/new">Blank document<small>Upload a PDF to send</small></a>
+          <a href="/templates">From a template<small>Send a form you set up before</small></a>
+          <a href="/templates/new">Blank template<small>Set up a form to reuse</small></a>
+        </div>
+      </details>
     </div>
     <% } %>
 
@@ -37,18 +46,17 @@
       </a>
 
       <details class="side-group" open>
-        <summary class="<%= here('/documents') && docFilter === null ? 'active' : '' %>">
+        <summary class="<%= here('/documents') && docFilter === null && path !== '/documents/trash' ? 'active' : '' %>">
           <%- icon('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M9 13h6M9 17h4"></path>') %>
           Documents
           <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
         </summary>
         <div class="side-sub">
-          <a href="/documents" class="<%= docFilter === '' ? 'active' : '' %>">All documents</a>
+          <a href="/documents" class="<%= docFilter === '' ? 'active' : '' %>">My Documents</a>
           <a href="/documents?status=draft" class="<%= docFilter === 'draft' ? 'active' : '' %>">Drafts</a>
-          <a href="/documents?status=sent" class="<%= docFilter === 'sent' ? 'active' : '' %>">Out for signature</a>
           <a href="/documents?status=completed" class="<%= docFilter === 'completed' ? 'active' : '' %>">Completed</a>
-          <a href="/documents?status=declined" class="<%= docFilter === 'declined' ? 'active' : '' %>">Declined</a>
+          <a href="/documents/trash" class="<%= path === '/documents/trash' ? 'active' : '' %>">Trash</a>
         </div>
       </details>
 
@@ -57,7 +65,7 @@
         Templates
       </a>
       <% } %>
-      <a href="/" class="<%= here('/') ? 'active' : '' %>">
+      <a href="/verification" class="<%= here('/verification') ? 'active' : '' %>">
         <%- icon('<path d="M12 3l7.5 3.3v5c0 4.6-3.2 8.3-7.5 9.4-4.3-1.1-7.5-4.8-7.5-9.4v-5z"></path><path d="m9 12 2.2 2.2L15.5 10"></path>') %>
         Verify a document
       </a>
@@ -67,10 +75,13 @@
       </a>
 
       <% if (isAdmin) { %>
-        <div class="side-sect">Administration</div>
         <a href="/team" class="<%= here('/team') ? 'active' : '' %>">
           <%- icon('<path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20"></path><circle cx="10" cy="8" r="3.2"></circle><path d="M20 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.4 5.2a3.2 3.2 0 0 1 0 5.6"></path>') %>
           Team
+        </a>
+        <a href="/activity" class="<%= here('/activity') ? 'active' : '' %>">
+          <%- icon('<path d="M4 12h3l2.5-6 5 12 2.5-6h3"></path>') %>
+          Activity log
         </a>
         <a href="/settings" class="<%= here('/settings') ? 'active' : '' %>">
           <%- icon('<circle cx="12" cy="12" r="2.8"></circle><path d="M19.4 14.5a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.6 1.6 0 0 0-1-1.4 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.6 1.6 0 0 0 1.4-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 1 1.4 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.6 1.6 0 0 0-1.4 1z"></path>') %>
@@ -90,7 +101,7 @@
 
     <div class="side-foot">
       <% if (orgName) { %>
-        <div class="side-org" title="<%= orgName %>">
+        <div class="side-org<%= company && company.logo_path ? ' side-org-has-logo' : '' %>" title="<%= orgName %>">
           <% if (company && company.logo_path) { %>
             <img class="side-org-logo" src="/company-logo/<%= company.id %>?v=<%= encodeURIComponent(company.logo_updated_at || '') %>" alt="">
           <% } else { %>

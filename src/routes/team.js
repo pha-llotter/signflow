@@ -15,7 +15,7 @@ router.get('/team', requireAdmin, (req, res) => {
   const users = db
     .prepare(
       `SELECT u.*,
-              (SELECT COUNT(*) FROM documents d WHERE d.owner_id = u.id AND d.status != 'template') AS document_count
+              (SELECT COUNT(*) FROM documents d WHERE d.owner_id = u.id AND d.status != 'template' AND d.deleted_at IS NULL) AS document_count
        FROM users u
        WHERE u.company_id = ?
        ORDER BY u.role = 'admin' DESC, u.status = 'active' DESC, u.display_name COLLATE NOCASE`
@@ -31,16 +31,36 @@ router.get('/team', requireAdmin, (req, res) => {
     )
     .all(req.user.company_id, nowIso());
 
-  const events = db.prepare('SELECT * FROM admin_events WHERE company_id = ? ORDER BY id DESC LIMIT 40').all(req.user.company_id);
 
   res.render('team', {
     users,
     invites,
-    events,
     mailReady: mailConfigured(req.user.company_id),
     baseUrl: config.baseUrl,
     activeAdmins: users.filter((u) => u.role === 'admin' && u.status === 'active').length,
   });
+});
+
+/**
+ * The organisation's activity log: who was invited, promoted, deactivated or
+ * reset, settings and logo changes, platform support sessions. Its own page
+ * rather than the foot of Team, because it grows without end and is read for
+ * a different reason. Paged by id, newest first.
+ */
+const ACTIVITY_PAGE = 100;
+
+router.get('/activity', requireAdmin, (req, res) => {
+  const before = Number(req.query.before) || null;
+  const rows = db
+    .prepare(
+      `SELECT * FROM admin_events
+       WHERE company_id = ? ${before ? 'AND id < ?' : ''}
+       ORDER BY id DESC LIMIT ?`
+    )
+    .all(...[req.user.company_id, ...(before ? [before] : []), ACTIVITY_PAGE + 1]);
+  const more = rows.length > ACTIVITY_PAGE;
+  const events = rows.slice(0, ACTIVITY_PAGE);
+  res.render('activity', { events, before, olderFrom: more ? events[events.length - 1].id : null });
 });
 
 router.post('/team/invite', requireAdmin, async (req, res) => {

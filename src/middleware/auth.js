@@ -89,7 +89,16 @@ export function currentUser(req, res, next) {
 }
 
 /** Sends an unauthenticated request to sign in, saying so if they were cut off. */
+/**
+ * The placer saves through /api with fetch, which follows a redirect silently
+ * and would read the sign-in page that comes back as a successful save. So an
+ * API request gets a status and a sentence it can show instead of a redirect.
+ */
+const isApi = (req) => req.originalUrl.startsWith('/api/');
+const apiError = (res, status, error) => res.status(status).json({ error });
+
 function toLogin(req, res) {
+  if (isApi(req)) return apiError(res, 401, 'You have been signed out. Sign in again in another tab, then save.');
   if (req.session) req.session.returnTo = req.originalUrl;
   if (req.companySuspended) return res.redirect('/login?suspended=1');
   return res.redirect(req.deactivated ? '/login?deactivated=1' : '/login');
@@ -100,12 +109,17 @@ function toLogin(req, res) {
  * team and settings all live inside one, so such an account is sent to the
  * platform pages instead — everything but its own profile.
  */
-const COMPANYLESS_OK = /^\/profile(\/|$)/;
+const COMPANYLESS_OK = /^\/(profile|verification)(\/|$)/;
 const outsideCompany = (req) => !req.user.company_id && !COMPANYLESS_OK.test(req.path);
 
 export function requireAuth(req, res, next) {
   if (!req.user) return toLogin(req, res);
-  if (outsideCompany(req)) return res.redirect('/platform');
+  if (outsideCompany(req)) {
+    if (isApi(req)) {
+      return apiError(res, 403, `This browser is now signed in as ${req.user.email}, which is not in a company. Sign in as the document's owner, then reload.`);
+    }
+    return res.redirect('/platform');
+  }
   next();
 }
 
@@ -166,7 +180,12 @@ export const canManageTemplate = (user, doc) =>
 export function editableDocument(req, res, next) {
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
   const ok = doc && (doc.status === 'template' ? canManageTemplate(req.user, doc) : doc.owner_id === req.user.id);
-  if (!ok) return res.status(404).render('error', { code: 404, message: 'Document not found.' });
+  if (!ok) {
+    if (isApi(req)) {
+      return apiError(res, 404, `${req.user.email} cannot edit this document — this browser may be signed in as a different account. Reload to check.`);
+    }
+    return res.status(404).render('error', { code: 404, message: 'Document not found.' });
+  }
   req.doc = doc;
   next();
 }

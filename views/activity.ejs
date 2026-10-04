@@ -1,0 +1,42 @@
+<%- include('partials/head', { title: 'Activity log' }) %>
+<%- include('partials/shell-start') %>
+
+  <div class="wrap">
+    <div class="page-head">
+      <div>
+        <h1>Activity log</h1>
+        <p class="sub">
+          Who was invited, promoted, deactivated or given a new password, changes to settings and the logo, and
+          platform support sessions. Kept apart from document audit trails, so it survives the deletion of every
+          document those people touched.
+        </p>
+      </div>
+    </div>
+
+    <div class="card">
+      <% if (!events.length) { %>
+        <p class="hint" style="margin:0"><%= before ? 'No older entries.' : 'Nothing recorded yet.' %></p>
+      <% } else { %>
+        <ul class="audit">
+          <% events.forEach(function (e) { %>
+            <li>
+              <time><%= new Date(e.created_at).toLocaleString() %></time>
+              <div>
+                <span class="who"><%= e.actor_email %></span> — <%= e.action %><% if (e.subject) { %>: <%= e.subject %><% } %>
+                <% if (e.detail) { %><span class="det"><%= e.detail %></span><% } %>
+                <span class="det"><%= e.ip || 'no IP recorded' %></span>
+              </div>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+      <% if (before || olderFrom) { %>
+        <div class="btn-row" style="margin-top:16px">
+          <% if (before) { %><a class="btn btn-ghost btn-sm" href="/activity">Newest entries</a><% } %>
+          <% if (olderFrom) { %><a class="btn btn-ghost btn-sm" href="/activity?before=<%= olderFrom %>">Older entries →</a><% } %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+<%- include('partials/shell-end') %>

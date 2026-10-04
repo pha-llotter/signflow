@@ -51,6 +51,14 @@ function loadByToken(req, res, next) {
       message: `You declined to sign "${doc.title}". Contact ${owner.display_name} if that was a mistake.`,
     });
   }
+  // In the sender's trash: closed for as long as it stays there, and open again
+  // if they restore it. Same neutral page as every other refusal.
+  if (doc.deleted_at) {
+    return res.status(410).render('sign-closed', {
+      heading: 'This document is no longer available',
+      message: `"${doc.title}" has been withdrawn by ${owner.display_name}. Contact them if you still need to sign it.`,
+    });
+  }
   if (doc.status === 'completed' || doc.status === 'declined') {
     return res.render('sign-closed', {
       heading: 'This document is closed',
