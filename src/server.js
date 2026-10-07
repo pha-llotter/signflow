@@ -28,7 +28,34 @@ const SqliteStore = SqliteStoreFactory(session);
 
 // Only trust proxy headers when told to — otherwise a client could spoof the
 // IP that ends up on the audit trail.
-if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY);
+//
+// Express reads a number here as "how many hops in front of me to trust" and a
+// string as a list of trusted addresses or presets. process.env only ever
+// yields strings, so TRUST_PROXY=1 was taken as an address literally named
+// "1", matched nothing, and left req.secure false behind a TLS-terminating
+// proxy -- which stops the secure session cookie from ever being sent and
+// makes every correct password look wrong. Converted back to its real type.
+const trustProxy = (process.env.TRUST_PROXY || '').trim();
+if (trustProxy) {
+  app.set(
+    'trust proxy',
+    /^\d+$/.test(trustProxy) ? Number(trustProxy)
+      : trustProxy === 'true' ? true
+        : trustProxy === 'false' ? false
+          : trustProxy
+  );
+}
+
+// A secure cookie behind a TLS-terminating proxy is dropped unless TRUST_PROXY
+// is set, and nothing in the request or the logs says so -- every correct
+// password simply comes back to the sign-in page. Say it at boot instead.
+if (process.env.NODE_ENV === 'production' && !app.get('trust proxy')) {
+  console.warn([
+    'Warning: NODE_ENV=production sends a secure session cookie, but TRUST_PROXY is unset.',
+    '         If anything terminates HTTPS in front of this app (nginx, Caddy, a load',
+    '         balancer), set TRUST_PROXY=1 or every sign-in will fail with no error.',
+  ].join('\n'));
+}
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(ROOT, 'views'));
